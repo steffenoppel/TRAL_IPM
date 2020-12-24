@@ -1,0 +1,271 @@
+
+
+  
+    model {
+    #-------------------------------------------------
+    # integrated population model for the Gough TRAL population
+    # - age structured model with 10 age classes 
+    # - adult survival based on CMR ringing data
+    # - pre breeding census, female-based assuming equal sex ratio & survival
+    # - productivity based on all areas incu and chick counts
+    # - simplified population process with assumed age at recruiting = 10 (Wanless et al. 2009)
+    # - adult breeders skipping when unsuccessful at rate of 22-32%, all successful breeders will skip
+    # - linked population process with SUM OF count data
+    # -------------------------------------------------
+    
+    #-------------------------------------------------  
+    # 1. PRIORS FOR ALL DATA SETS
+    #-------------------------------------------------
+    
+    
+    # -------------------------------------------------        
+    # 1.1. Priors and constraints FOR FECUNDITY
+    # -------------------------------------------------
+    
+    for (t in 1:T){  
+      ann.fec[t] ~ dunif(0.05,0.65) ## dnorm(0.32,10) T(0.001,0.999)        ## Informative Priors on fecundity based on Wanless et al 2009
+      skip.prob[t] ~ dunif(0.05,0.95) ## dunif(0.22,0.32) T(0.001,0.999)           ## PRIOR FOR ADULT FAILED BREEDER SKIPPING PROBABILITY from Wanless et al 2009
+    } #t
+
+    
+    # -------------------------------------------------        
+    # 1.2. Priors and constraints FOR POPULATION COUNTS
+    # -------------------------------------------------
+    for (s in 1:n.sites){			### start loop over every study area
+      N.est[1,s] ~ dunif(0,400)   ## draw random value from a uniform distribution between 0 and 200 for initial population size
+      sigma.proc[s] ~ dunif(0,10)	#Prior for SD of state process (annual variation in pop size)
+      tau.proc[s]<-pow(sigma.proc[s],-2)
+      sigma.obs[s] ~ dunif(0,100)	#Prior for SD of observation process (variation in detectability)
+      tau.obs[s]<-pow(sigma.obs[s],-2)
+    }
+
+
+    # -------------------------------------------------        
+    # 1.3. Priors and constraints FOR SURVIVAL
+    # -------------------------------------------------
+    
+    ### RECAPTURE PROBABILITY
+    mean.p ~ dunif(0.5, 0.99)                          # Prior for mean recapture
+    logit.p <- log(mean.p / (1-mean.p))           # Logit transformation
+    
+    for (t in 1:T){
+      logit(p[t]) <- logit.p  + capt.raneff[t]
+      capt.raneff[t] ~ dnorm(0, tau.capt)
+    }
+    
+    ### SURVIVAL PROBABILITY
+    for (i in 1:nind){
+      for (t in f[i]:(T-1)){
+        logit(phi[i,t]) <- mu[AGEMAT[i,t]] + surv.raneff[AGEMAT[i,t],t]       ###+ bycatch*longline[t]
+      } #t
+    } #i
+    
+    
+    ## AGE-SPECIFIC SURVIVAL 
+    for (age in 1:2){
+      beta[age] ~ dunif(0.5, 0.99)            # Priors for age-specific survival
+      mu[age] <- log(beta[age] / (1-beta[age]))       # Logit transformation
+    
+      ## RANDOM TIME EFFECT ON SURVIVAL VARIES BY AGE GROUP
+      for (t in 1:(T-1)){
+        surv.raneff[age,t] ~ dnorm(0, tau.surv[age])
+      }
+    
+      ### PRIORS FOR RANDOM EFFECTS
+      sigma.surv[age] ~ dunif(1, 10)                     # Prior for standard deviation of survival
+      tau.surv[age] <- pow(sigma.surv[age], -2)
+    
+    }
+    
+    sigma.capt ~ dunif(0, 10)                     # Prior for standard deviation of capture
+    tau.capt <- pow(sigma.capt, -2)
+    
+    
+
+    #-------------------------------------------------  
+    # 2. LIKELIHOODS AND ECOLOGICAL STATE MODEL
+    #-------------------------------------------------
+    
+    # -------------------------------------------------        
+    # 2.1. System process: female based matrix model
+    # -------------------------------------------------
+    
+    for (tt in 2:T){
+    
+      ## THE PRE-BREEDING YEARS ##
+    
+      nestlings[tt] <- ann.fec[tt] * 0.5 * Ntot.breed[tt]                                                     ### number of locally produced FEMALE chicks
+      JUV[tt] ~ dpois(nestlings[tt])                                                                     ### need a discrete number otherwise dbin will fail, dpois must be >0
+      N1[tt]  ~ dbin(ann.surv[1,tt-1], round(JUV[tt-1]))                                                    ### number of 1-year old survivors 
+      N2[tt] ~ dbin(ann.surv[1,tt-1], round(N1[tt-1]))                                                      ### number of 2-year old survivors
+      N3[tt] ~ dbin(ann.surv[1,tt-1], round(N2[tt-1]))                                                       ### number of 3-year old survivors
+      N4[tt] ~ dbin(ann.surv[1,tt-1], round(N3[tt-1]))                                                       ### number of 4-year old survivors
+      N5[tt] ~ dbin(ann.surv[1,tt-1], round(N4[tt-1]))                                                       ### number of 5-year old survivors
+      N6[tt] ~ dbin(ann.surv[2,tt-1], round(N5[tt-1]))                                                       ### number of 6-year old survivors
+      N7[tt] ~ dbin(ann.surv[2,tt-1], round(N6[tt-1]))                                                       ### number of 7-year old survivors
+      N8[tt] ~ dbin(ann.surv[2,tt-1], round(N7[tt-1]))                                                       ### number of 8-year old survivors
+      N9[tt] ~ dbin(ann.surv[2,tt-1], round(N8[tt-1]))                                                       ### number of 9-year old survivors
+    
+
+      ## THE BREEDING POPULATION ##
+
+      # Ntot.breed comprised of first-time breeders, previous skippers, and previous unsuccessful breeders
+      N.succ.breed[tt] ~ dbin(ann.fec[tt], round(Ntot.breed[tt]))                     ### number of successful breeders not breeding the following year
+      N.unsucc.breed[tt] <- round(Ntot.breed[tt]-N.succ.breed[tt])
+      N.fail.skip[tt] ~ dbin(skip.prob[tt], max(1,N.unsucc.breed[tt]))   ### number of unsuccessful breeders not breeding the following year
+      N.nonbreed[tt] <- round(sum(N.succ.breed[tt-1],N.fail.skip[tt-1])) ### number of nonbreeders as the sum of previous year successful and skipping unsuccessful breeders
+      N.non.breed[tt] ~ dbin(ann.surv[2,tt-1], N.nonbreed[tt])  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
+
+      N.breed.ready[tt]<- round((Ntot.breed[tt-1]-N.succ.breed[tt-1]-N.fail.skip[tt-1])+N9[tt-1]+N.non.breed[tt-1])       ### number of available breeders is failed breeders from previous year plus non-breeders from previous year plus recruits (N9)
+      Ntot.breed[tt] ~ dbin(ann.surv[2,tt-1], N.breed.ready[tt])   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+
+ 
+    } # tt
+    
+    
+    
+    ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
+    #start ~ dunif(1000,4000)
+    Ntot.breed[1] <- 2400   ### sum of counts is 2400
+    JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
+    N1[1]<-round(JUV[1]*beta[1])
+    N2[1]<-round(N1[1]*beta[1])
+    N3[1]<-round(N2[1]*beta[1])
+    N4[1]<-round(N3[1]*beta[1])
+    N5[1]<-round(N4[1]*beta[1])
+    N6[1]<-round(N5[1]*beta[2])
+    N7[1]<-round(N6[1]*beta[2])
+    N8[1]<-round(N7[1]*beta[2])
+    N9[1]<-round(N8[1]*beta[2])
+    N.nonbreed[1]<-round(sum(N.succ.breed[1],N.fail.skip[1]))
+    N.non.breed[1]~ dbin(beta[2], N.nonbreed[1])
+    N.succ.breed[1]<- round(Ntot.breed[1]*ann.fec[1])
+    N.unsucc.breed[1] <- (Ntot.breed[1]-N.succ.breed[1])
+    N.fail.skip[1]<- round(N.unsucc.breed[1]*skip.prob[1])
+
+
+    # -------------------------------------------------        
+    # 2.2. Observation process for population counts: state-space model of annual counts
+    # -------------------------------------------------
+    
+    for (s in 1:n.sites){			### start loop over every study area
+    
+      ## Observation process
+    
+      for (t in 1:T){
+        y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s])								# Distribution for random error in observed numbers (counts)
+      }														# run this loop over t= nyears
+    }		## end site loop
+
+    
+    # -------------------------------------------------        
+    # 2.3. Likelihood for fecundity: Logistic regression from the number of surveyed broods
+    # -------------------------------------------------
+    for (s in 1:n.sites){			### start loop over every study area
+      for (t in 1:(T-1)){
+        J[t,s] ~ dpois(rho.fec[t,s])
+        rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
+      } #	close loop over every year in which we have fecundity data
+    }		## end site loop
+    
+    
+    
+    
+    # -------------------------------------------------        
+    # 2.4. Likelihood for adult and juvenile survival from CMR
+    # -------------------------------------------------
+    
+    # Likelihood 
+    for (i in 1:nind){
+
+      # Define latent state at first capture
+      z[i,f[i]] <- 1
+
+      for (t in (f[i]+1):T){
+    
+        # State process
+        z[i,t] ~ dbern(mu1[i,t])
+        mu1[i,t] <- phi[i,t-1] * z[i,t-1]
+    
+        # Observation process
+        y[i,t] ~ dbern(mu2[i,t])
+        mu2[i,t] <- p[t] * z[i,t]
+      } #t
+    } #i
+    
+    
+    
+    
+    #-------------------------------------------------  
+    # 3. DERIVED PARAMETERS FOR OUTPUT REPORTING
+    #-------------------------------------------------
+    
+    ## DERIVED SURVIVAL PROBABILITIES PER YEAR 
+    for (t in 1:(T-1)){
+      for (age in 1:2){
+        logit(ann.surv[age,t]) <- mu[age] + surv.raneff[age,t]
+      }
+    }
+
+    ## DERIVED POPULATION GROWTH RATE PER YEAR
+    for (t in 1:(T-1)){
+      lambda[t]<-Ntot.breed[t+1]/max(1,Ntot.breed[t])  ## division by 0 creates invalid parent value
+    }		## end year loop
+    
+
+    ## DERIVED MEAN FECUNDITY 
+    mean.fec <- mean(ann.fec)
+    mean.skip <- mean(skip.prob)
+    pop.growth.rate <- exp((1/(T-1))*sum(log(lambda[1:(T-1)])))   # Geometric mean
+
+    #-------------------------------------------------  
+    # 4. PROJECTION INTO FUTURE
+    #-------------------------------------------------
+    
+    
+    for (tt in (T+1):FUT.YEAR){
+    
+
+    # -------------------------------------------------        
+    # 4.1. System process for future
+    # -------------------------------------------------
+    
+    ## THE PRE-BREEDING YEARS ##
+    ## because it goes for 30 years, all pops must be safeguarded to not become 0 because that leads to invald parent error
+    
+    nestlings[tt] <- round(mean.fec* 0.5 * Ntot.breed[tt])                                             ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
+    N1[tt]  ~ dbin(beta[1], max(1,round(nestlings[tt-1])))                                                    ### number of 1-year old survivors 
+    N2[tt] ~ dbin(beta[1], max(1,round(N1[tt-1])))                                                      ### number of 2-year old survivors
+    N3[tt] ~ dbin(beta[1], max(1,round(N2[tt-1])))                                                       ### number of 3-year old survivors
+    N4[tt] ~ dbin(beta[1], max(1,round(N3[tt-1])))                                                       ### number of 4-year old survivors
+    N5[tt] ~ dbin(beta[1], max(1,round(N4[tt-1])))                                                       ### number of 5-year old survivors
+    N6[tt] ~ dbin(beta[2], max(1,round(N5[tt-1])))                                                       ### number of 6-year old survivors
+    N7[tt] ~ dbin(beta[2], max(1,round(N6[tt-1])))                                                       ### number of 7-year old survivors
+    N8[tt] ~ dbin(beta[2], max(1,round(N7[tt-1])))                                                       ### number of 8-year old survivors
+    N9[tt] ~ dbin(beta[2], max(1,round(N8[tt-1])))                                                       ### number of 9-year old survivors
+    
+
+    ## THE BREEDING POPULATION ##
+
+    # Ntot.breed comprised of first-time breeders, previous skippers, and previous unsuccessful breeders
+    N.succ.breed[tt] ~ dbin(mean.fec, max(1,round(Ntot.breed[tt])))                     ### number of successful breeders not breeding the following year
+    N.unsucc.breed[tt] <- round(Ntot.breed[tt]-N.succ.breed[tt])
+    N.fail.skip[tt] ~ dbin(mean.skip, max(1,N.unsucc.breed[tt]))   ### number of unsuccessful breeders not breeding the following year
+    N.nonbreed[tt] <- round(sum(N.succ.breed[tt-1],N.fail.skip[tt-1])) ### number of nonbreeders as the sum of previous year successful and skipping unsuccessful breeders
+    N.non.breed[tt] ~ dbin(beta[2], max(1,N.nonbreed[tt]))  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
+    
+    N.breed.ready[tt]<- round((Ntot.breed[tt-1]-N.succ.breed[tt-1]-N.fail.skip[tt-1])+N9[tt-1]+N.non.breed[tt-1])       ### number of available breeders is failed breeders from previous year plus non-breeders from previous year plus recruits (N9)
+    Ntot.breed[tt] ~ dbin(beta[2], max(1,N.breed.ready[tt]))   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+    
+    
+    ## CALCULATE ANNUAL POP GROWTH RATE ##
+    fut.lambda[tt-T] <- Ntot.breed[tt]/max(1,Ntot.breed[tt-1])                                 ### inserted safety to prevent denominator being 0
+
+
+    } ### end future loop
+    
+    ## DERIVED MEAN FUTURE GROWTH RATE  
+    fut.growth.rate <- exp((1/(FUT.YEAR-T))*sum(log(fut.lambda[1:(FUT.YEAR-T)])))   # Geometric mean
+    
+}  ## end model loop
+

@@ -1,0 +1,65 @@
+
+
+  
+    model {
+    #-------------------------------------------------
+    # state space model for population counts
+    # -------------------------------------------------
+    
+    #-------------------------------------------------  
+    # 1. PRIORS FOR POPULATION COUNTS
+    #-------------------------------------------------
+    
+    for (s in 1:n.sites){			### start loop over every study area
+      N.est[1,s] ~ dunif(0,400)   ## draw random value from a uniform distribution between 0 and 200 for initial population size
+      mean.lambda[s] ~ dunif(0,10)	#Prior for mean growth rate
+      sigma.proc[s] ~ dunif(0,10)	#Prior for SD of state process (annual variation in pop size)
+      tau.proc[s]<-pow(sigma.proc[s],-2)
+      sigma.obs[s] ~ dunif(0,100)	#Prior for SD of observation process (variation in detectability)
+      tau.obs[s]<-pow(sigma.obs[s],-2)
+    }
+    
+
+    #-------------------------------------------------  
+    # 2. LIKELIHOOD FOR POPULATION COUNT DATA
+    #-------------------------------------------------
+
+    for (s in 1:n.sites){			### start loop over every study area
+    
+      ## State process for entire time series
+    
+          for (t in 1:(T-1)){
+            lambda[t,s] ~ dnorm(mean.lambda[s], tau.proc[s])								# Distribution for random error of growth rate
+            N.est[t+1,s]<-N.est[t,s]*lambda[t,s]										        # Linear predictor (population size based on past pop size and change rate)
+          }														# run this loop over nyears
+    
+    
+      ## Observation process
+    
+          for (t in 1:T){
+            R[t,s] ~ dnorm(N.est[t,s], tau.obs[s])								# Distribution for random error in observed numbers (counts)
+          }														# run this loop over t= nyears
+    }		## end site loop
+    
+
+    #-------------------------------------------------  
+    # 3. DERIVED DATA FOR OUTPUT
+    #-------------------------------------------------
+
+    ## DERIVED POPULATION SIZE PER YEAR
+    for (t in 1:T){
+      pop.size[t]<-sum(N.est[t,1:n.sites])
+
+        for (s in 1:n.sites) {
+          prop[t,s]<-N.est[t,s]/pop.size[t]
+        } ## end site loop
+    }		## end year loop
+
+    pop.growth.rate<-mean(mean.lambda[])
+    
+ 
+ }      ## END MODEL 
+    
+    
+    
+    
