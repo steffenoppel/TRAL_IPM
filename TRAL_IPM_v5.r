@@ -165,43 +165,36 @@ cat("
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    mean.p ~ dunif(0.5, 0.99)                          # Prior for mean recapture
-    logit.p <- log(mean.p / (1-mean.p))           # Logit transformation
-    
-    for (t in 1:T){
-      logit(p[t]) <- logit.p  + capt.raneff[t]
-      capt.raneff[t] ~ dnorm(0, tau.capt)
-    }
+    mean.p.juv ~ dunif(0.2, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
+    mean.p.ad ~ dunif(0.2, 1)	           # Prior for mean adult recapture - should be higher than 20%
+    mu.p.juv <- log(mean.p.juv / (1-mean.p.juv)) # Logit transformation
+    mu.p.ad <- log(mean.p.ad / (1-mean.p.ad)) # Logit transformation
+
+    ## PRIORS FOR RANDOM EFFECTS
+    sigma.p ~ dunif(0, 1)                # Prior for standard deviation
+    tau.p <- pow(sigma.p, -2)
+
     
     ### SURVIVAL PROBABILITY
-    for (i in 1:nind){
-      for (t in f[i]:(T-1)){
-        logit(phi[i,t]) <- mu[AGEMAT[i,t]] + surv.raneff[AGEMAT[i,t],t]       ###+ bycatch*longline[t]
-      } #t
-    } #i
-    
-    
-    ## AGE-SPECIFIC SURVIVAL 
-    for (age in 1:2){
-      beta[age] ~ dunif(0.5, 0.99)            # Priors for age-specific survival
-      mu[age] <- log(beta[age] / (1-beta[age]))       # Logit transformation
-    
-    }
+    mean.phi.juv ~ dunif(0, 1)             # Prior for mean juvenile survival
+    mean.phi.ad ~ dunif(0.7, 1)             # Prior for mean adult survival - should be higher than 70%
+    mu.juv <- log(mean.phi.juv / (1-mean.phi.juv)) # Logit transformation
+    mu.ad <- log(mean.phi.ad / (1-mean.phi.ad)) # Logit transformation
 
+    ## PRIORS FOR RANDOM EFFECTS
+    sigma.phi ~ dunif(0, 1)                # Prior for standard deviation
+    tau.phi <- pow(sigma.phi, -2)
+    
     ## RANDOM TIME EFFECT ON SURVIVAL ONLY FOR ADULTS (age group = 2)
-    for (t in 1:(T-1)){
-        surv.raneff[1,t] <- 0
-        surv.raneff[2,t] ~ dnorm(0, tau.surv)
+    for (t in 1:(n.occasions-1)){
+      logit(phi.juv[t]) <- mu.juv + eps.phi[t]
+      logit(phi.ad[t]) <- mu.ad + eps.phi[t]
+      eps.phi[t] ~ dnorm(0, tau.phi) 
+      logit(p.ad[t])  <- mu.p.ad + eps.p[t]
+      logit(p.juv[t])  <- mu.p.juv + eps.p[t]
+      eps.p[t] ~ dnorm(0, tau.p) 
     }
 
-    ### PRIORS FOR RANDOM EFFECTS
-    sigma.surv ~ dunif(0, 2)                     # Prior for standard deviation of survival
-    tau.surv <- pow(sigma.surv, -2)
-    
-    sigma.capt ~ dunif(0, 10)                     # Prior for standard deviation of capture
-    tau.capt <- pow(sigma.capt, -2)
-    
-    
 
     #-------------------------------------------------  
     # 2. LIKELIHOODS AND ECOLOGICAL STATE MODEL
@@ -295,37 +288,40 @@ cat("
     # 2.4. Likelihood for adult and juvenile survival from CMR
     # -------------------------------------------------
     
-    # Likelihood 
-    for (i in 1:nind){
+    # Define the multinomial likelihood
+    for (t in 1:(n.occasions-1)){
+      marr.j[t,1:n.occasions] ~ dmulti(pr.j[t,], r.j[t])
+      marr.a[t,1:n.occasions] ~ dmulti(pr.a[t,], r.a[t])
+    }
+    
+    
+    # Define the cell probabilities of the m-arrays
+    # Main diagonal
+    for (t in 1:(n.occasions-1)){
+      q.juv[t] <- 1-p.juv[t]            # Probability of non-recapture
+      q.ad[t] <- 1-p.ad[t]            # Probability of non-recapture
+      pr.j[t,t] <- phi.juv[t]*p.juv[t]
+      pr.a[t,t] <- phi.ad[t]*p.ad[t]
+    
+      # Above main diagonal
+      for (j in (t+1):(n.occasions-1)){
+        pr.j[t,j] <- phi.juv[t]*prod(phi.ad[(t+1):j])*prod(q.juv[t:(j-1)])*p.juv[j]
+        pr.a[t,j] <- prod(phi.ad[t:j])*prod(q.ad[t:(j-1)])*p.ad[j]
+      } #j
+    
+      # Below main diagonal
+      for (j in 1:(t-1)){
+        pr.j[t,j] <- 0
+        pr.a[t,j] <- 0
+      } #j
+    } #t
+    
 
-      # Define latent state at first capture
-      z[i,f[i]] <- 1
-
-      for (t in (f[i]+1):T){
-    
-        # State process
-        z[i,t] ~ dbern(mu1[i,t])
-        mu1[i,t] <- phi[i,t-1] * z[i,t-1]
-    
-        # Observation process
-        y[i,t] ~ dbern(mu2[i,t])
-        mu2[i,t] <- p[t] * z[i,t]
-      } #t
-    } #i
-    
-    
-    
     
     #-------------------------------------------------  
     # 3. DERIVED PARAMETERS FOR OUTPUT REPORTING
     #-------------------------------------------------
     
-    ## DERIVED SURVIVAL PROBABILITIES PER YEAR 
-    for (t in 1:(T-1)){
-      for (age in 1:2){
-        logit(ann.surv[age,t]) <- mu[age] + surv.raneff[age,t]
-      }
-    }
 
     ## DERIVED POPULATION GROWTH RATE PER YEAR
     for (t in 1:(T-1)){
@@ -339,7 +335,6 @@ cat("
     pop.growth.rate <- exp((1/(T-1))*sum(log(lambda[1:(T-1)])))   # Geometric mean
 
 
-
     #-------------------------------------------------  
     # 4. PROJECTION INTO FUTURE
     #-------------------------------------------------
@@ -349,15 +344,15 @@ cat("
     ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
 
-    ### INCLUDE RANDOM SURVIVAL VARIATION IN SURVIVAL ###
-
-    for (tt in 1:FUT.YEAR){
-      fut.raneff[tt] ~ dnorm(0, tau.surv)
-
-        for (age in 1:2){
-          logit(fut.phi[age,tt]) <- mu[age] + fut.raneff[tt]       ###
-        } #t
-    }
+    # ### INCLUDE RANDOM SURVIVAL VARIATION IN SURVIVAL ###
+    # 
+    # for (tt in 1:FUT.YEAR){
+    #   fut.raneff[tt] ~ dnorm(0, tau.surv)
+    # 
+    #     for (age in 1:2){
+    #       logit(fut.phi[age,tt]) <- mu[age] + fut.raneff[tt]       ###
+    #     } #t
+    # }
 
 
  
