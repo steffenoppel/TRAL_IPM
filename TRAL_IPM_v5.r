@@ -111,6 +111,12 @@ n.sites<-dim(R)[2]    ## defines the number of study areas
 
 
 
+### DIMENSION MISMATCH IN DATA
+# IPM runs from 2001-2020
+# survival analysis runs from 1979-2021
+min(which(!is.na(match(as.numeric(names(TRAL_CHICK)[2:44]),POPSIZE$Year))))
+
+
 
 #########################################################################
 # SPECIFY MODEL IN JAGS
@@ -365,7 +371,7 @@ for(scen in 1:n.scenarios){
     N.nonbreed.f[scen,1] <- round(sum(N.succ.breed[T-1],N.fail.skip[T-1])) ### number of nonbreeders as the sum of previous year successful and skipping unsuccessful breeders
     N.non.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,N.nonbreed[T]))  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
     N.breed.ready.f[scen,1]<- round((Ntot.breed[T-1]-N.succ.breed[T-1]-N.fail.skip[T-1])+N9[T-1]+N.non.breed[T-1])       ### number of available breeders is failed breeders from previous year plus non-breeders from previous year plus recruits (N9)
-    Ntot.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*fut.phi[2,1], max(1,N.breed.ready[T]))   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+    Ntot.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,N.breed.ready[T]))   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
     carr.capacity[scen,1]<-2500
     Ntot.breed.raw[scen,1]<-Ntot.breed.f[scen,1]
 
@@ -466,9 +472,7 @@ jags.data <- list(marr.j = chick.marray,
 
 
 # Initial values 
-inits <- function(){list(beta = runif(2, 0.5, 0.99),
-                         z = zinit,
-                         mean.phi.ad = runif(1, 0.7, 1),
+inits <- function(){list(mean.phi.ad = runif(1, 0.7, 1),
                          mean.phi.juv = runif(1, 0, 1),
                          mean.p = runif(1, 0, 1),
                          Ntot.breed= c(1638,rep(NA,n.years-1)),
@@ -489,7 +493,7 @@ parameters <- c("Ntot.breed","Ntot.breed.f","ann.fec","mean.phi.ad","mean.phi.ju
 # MCMC settings
 ni <- 150000
 nt <- 2
-nb <- 5000
+nb <- 500
 nc <- 3
 
 

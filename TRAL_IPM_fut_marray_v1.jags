@@ -95,11 +95,11 @@
       N2[tt] ~ dbin(mean.phi.juv, round(N1[tt-1]))                                                      ### number of 2-year old survivors
       N3[tt] ~ dbin(mean.phi.juv, round(N2[tt-1]))                                                       ### number of 3-year old survivors
       N4[tt] ~ dbin(mean.phi.juv, round(N3[tt-1]))                                                       ### number of 4-year old survivors
-      N5[tt] ~ dbin(phi.ad[tt+22], round(N4[tt-1]))                                                       ### number of 5-year old survivors
-      N6[tt] ~ dbin(phi.ad[tt+22], round(N5[tt-1]))                                                       ### number of 6-year old survivors
-      N7[tt] ~ dbin(phi.ad[tt+22], round(N6[tt-1]))                                                       ### number of 7-year old survivors
-      N8[tt] ~ dbin(phi.ad[tt+22], round(N7[tt-1]))                                                       ### number of 8-year old survivors
-      N9[tt] ~ dbin(phi.ad[tt+22], round(N8[tt-1]))                                                       ### number of 9-year old survivors
+      N5[tt] ~ dbin(mean.phi.ad, round(N4[tt-1]))                                                       ### number of 5-year old survivors
+      N6[tt] ~ dbin(mean.phi.ad, round(N5[tt-1]))                                                       ### number of 6-year old survivors
+      N7[tt] ~ dbin(mean.phi.ad, round(N6[tt-1]))                                                       ### number of 7-year old survivors
+      N8[tt] ~ dbin(mean.phi.ad, round(N7[tt-1]))                                                       ### number of 8-year old survivors
+      N9[tt] ~ dbin(mean.phi.ad, round(N8[tt-1]))                                                       ### number of 9-year old survivors
     
 
       ## THE BREEDING POPULATION ##
@@ -109,10 +109,10 @@
       N.unsucc.breed[tt] <- round(Ntot.breed[tt]-N.succ.breed[tt])
       N.fail.skip[tt] ~ dbin(skip.prob[tt], max(1,N.unsucc.breed[tt]))   ### number of unsuccessful breeders not breeding the following year
       N.nonbreed[tt] <- round(sum(N.succ.breed[tt-1],N.fail.skip[tt-1])) ### number of nonbreeders as the sum of previous year successful and skipping unsuccessful breeders
-      N.non.breed[tt] ~ dbin(phi.ad[tt+22], N.nonbreed[tt])  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
+      N.non.breed[tt] ~ dbin(mean.phi.ad, N.nonbreed[tt])  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
 
       N.breed.ready[tt]<- round((Ntot.breed[tt-1]-N.succ.breed[tt-1]-N.fail.skip[tt-1])+N9[tt-1]+N.non.breed[tt-1])       ### number of available breeders is failed breeders from previous year plus non-breeders from previous year plus recruits (N9)
-      Ntot.breed[tt] ~ dbin(phi.ad[tt+22], N.breed.ready[tt])   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+      Ntot.breed[tt] ~ dbin(mean.phi.ad, N.breed.ready[tt])   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
 
  
     } # tt
@@ -246,7 +246,7 @@ for(scen in 1:n.scenarios){
     N.nonbreed.f[scen,1] <- round(sum(N.succ.breed[T-1],N.fail.skip[T-1])) ### number of nonbreeders as the sum of previous year successful and skipping unsuccessful breeders
     N.non.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,N.nonbreed[T]))  ### number of non-breeders in a given year is composed of the successful skippers and failed skippers from previous year       
     N.breed.ready.f[scen,1]<- round((Ntot.breed[T-1]-N.succ.breed[T-1]-N.fail.skip[T-1])+N9[T-1]+N.non.breed[T-1])       ### number of available breeders is failed breeders from previous year plus non-breeders from previous year plus recruits (N9)
-    Ntot.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*fut.phi[2,1], max(1,N.breed.ready[T]))   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+    Ntot.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,N.breed.ready[T]))   ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
     carr.capacity[scen,1]<-2500
     Ntot.breed.raw[scen,1]<-Ntot.breed.f[scen,1]
 
