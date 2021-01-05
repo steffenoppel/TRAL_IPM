@@ -5,8 +5,9 @@
 ### written by Steffen Oppel in December 2018
 ### steffen.oppel@rspb.org.uk
 ### uses existing CMR and breeding database to extract data
-
 ## updated on 31 March 2020
+
+## completely revised on 5 Jan 2021 to incorporate m-array survival estimation in IPM
 
 library(tidyverse)
 library(lubridate)
@@ -18,29 +19,27 @@ select<-dplyr::select
 #############################################################################
 ##   1. SPECIFY THE SPECIES AND START YEAR FOR WHICH YOU WANT A SUMMARY ####
 #############################################################################
+## SPECIFY THE SPECIES AND START YEAR FOR SURVIVAL MODEL
 SP<-"TRAL"
-start<-2000
-
-
+start<-1978  ## for CMR data
+IPMstart<-2000 ## for count and breeding success data
 
 
 ###################################################################################
-##   2. READ IN DATA FROM DATABASES AND FILTER DATA FOR SPECIES OF INTEREST ####
+##   2. READ IN DATA FROM DATABASE AND FILTER DATA FOR SPECIES OF INTEREST ####
 ###################################################################################
+
+## run the RODBC import of CMR data in a 32-bit version of R
+system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
+load("GOUGH_seabird_CMR_data.RData")
 
 ## run the RODBC import of nest and count data in a 32-bit version of R
 system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
 
-## run the RODBC import of CMR data in a 32-bit version of R
-system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\SeabirdSurvival\\RODBC_CMR_import.R")), wait = TRUE, invisible = FALSE, intern = T)
-try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\SeabirdSurvival"), silent=T)
-load("GOUGH_seabird_CMR_data.RData")
-
 ## filter data for the selected species
-contacts<-contacts %>% filter(SpeciesCode==SP)
-ages<-ages %>% filter(SpeciesCode==SP)
 nests<-nests %>% filter(Species==SP)
 counts<-counts %>% filter(Species==SP)
 
@@ -77,7 +76,7 @@ exclude <- nests %>%
 
 
 ### summary of breeding success per year from nests
-FECUND<-nests %>% filter(Year<2020) %>% filter(Species==SP) %>% mutate(count=1) %>%
+FECUND<-nests %>% filter(Year<2021) %>% filter(Species==SP) %>% mutate(count=1) %>%
   filter(!NestID %in% exclude$NestID) %>%
   group_by(Year,Colony) %>%
   summarise(n_nests=sum(count),BREED_SUCC=mean(SUCCESS, na.rm=T))
@@ -91,7 +90,6 @@ FECUND<-FECUND %>% filter(Colony=="Gonydale")
 
 ### PLOT TO SPOT ANY OUTLIERS OF BREEDING SUCCESS
 ggplot(FECUND, aes(x=Year,y=BREED_SUCC)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') 
-fwrite(FECUND,"TRAL_breed_success_2006_2019.csv")
 
 
 
@@ -108,7 +106,7 @@ POPSIZE<-counts %>% filter(Species==SP) %>%
   mutate(Colony= if_else(Colony=="Green Hill South","Green Hill",Colony)) %>%
   mutate(Colony= if_else(Colony=="Green Hill North","Green Hill",Colony)) %>%
   mutate(Year=year(Date)) %>%
-  filter(Year>start) %>%
+  filter(Year>IPMstart) %>%
   filter(Breed_Stage=="INCU") %>%
   filter(Cohort %in% c("INCU","TERR","AON")) %>%
   filter(!(Colony=='Albatross Plain'& Year==2009 & Method=='COLO')) %>%
@@ -127,7 +125,7 @@ CHICKCOUNT<-counts %>% filter(Species==SP) %>%
   mutate(Colony= if_else(Colony=="Green Hill South","Green Hill",Colony)) %>%
   mutate(Colony= if_else(Colony=="Green Hill North","Green Hill",Colony)) %>%
   mutate(Year=year(Date)) %>%
-  filter(Year>start) %>%
+  filter(Year>IPMstart) %>%
   filter(Breed_Stage %in% c("CHIC","FLED")) %>%
   filter(Cohort %in% c("CHIC","FLED")) %>%
   group_by(Year,Colony) %>%
@@ -155,8 +153,7 @@ counts %>% filter(Colony=='Gonydale' & year(Date)==2017)
 
 dim(POPSIZE)
 dim(CHICKCOUNT)
-fwrite(CHICKCOUNT,"TRAL_CHIC_counts_2001_2020.csv")
-fwrite(POPSIZE,"TRAL_INCU_counts_2001_2020.csv")
+
 
 
 
@@ -165,45 +162,15 @@ fwrite(POPSIZE,"TRAL_INCU_counts_2001_2020.csv")
 ##   5. PREPARE THE MARK-RECAPTURE DATA FOR SURVIVAL ANALYSIS ###############
 #############################################################################
 
-### checked on 25 Dec 2018: CMR database does not have satisfactory level of age or breeding status assignment for vast majority of contacts
-## including 'age' and 'breeding status' reduces number of contacts from ~49000 to ~6000
-## including the side on which a federal band was applied reduces the AYNA contacts from 25201 to 7786
-## the only AYNA ringed as 'Chick' are from the 2015-16 season
-## given the gross inadequacies of past records it is safer to simply use 0/1 contacts and assume all birds are breeding
-## created new query called 'metalside' which extracts the recorded side of the body for the metal ring - all birds ringed as chicks should have "L"
+### COPIED FROM C:\STEFFEN\RSPB\UKOT\Gough\ANALYSIS\SeabirdSurvival\TRAL_survival_marray.r
 
+## filter data for the selected species
+contacts<-contacts %>% filter(SpeciesCode==SP) ## %>% filter(Location %in% c("Hummocks","Gonydale","Tafelkop","Not Specified")) - this removes age info for chicks ringed elsewhere!
+ages<-ages %>% filter(SpeciesCode==SP)
+bands<-bands %>% filter(SpeciesCode==SP)
 
 head(contacts)  ## CMR data
 dim(contacts)
-
-### REMOVE RECORDS FROM BEFORE THE SET START YEAR
-contacts<-contacts %>%
-  filter(year(Date_Time)>start) 
-dim(contacts)
-
-
-### FIND MISSING DATA FOR SEASON AND REPLACE BASED ON DATE
-## changed on 13 July 2019 - use a single calendar year as encounter occasion, not a season (season goes Jan - Nov anyway)
-
-contacts<-contacts %>%
-  # mutate(Contact_Season=as.character(Contact_Season)) %>%
-  # mutate(MO=month(Date_Time)) %>%
-  # mutate(Season1=paste(Contact_Year,(as.numeric(substr(Contact_Year,3,4))+1),sep="-")) %>%
-  # mutate(Season2=paste(Contact_Year-1,substr(Contact_Year,3,4),sep="-")) %>%
-  # mutate(Contact_Season=if_else(is.na(Contact_Season), if_else(MO>6,Season1,Season2),Contact_Season)) %>%
-  mutate(Contact_Year=if_else(is.na(Contact_Year),as.integer(year(Date_Time)),Contact_Year)) %>%
-  select(BirdID,Location,Contact_Year)
-dim(contacts)
-head(contacts)
-
-
-### CREATE SIMPLE ENCOUNTER HISTORY (0/1)
-TRAL_EH<-contacts %>% select(BirdID,Contact_Year) %>%
-  mutate(count=1) %>%
-  group_by(BirdID,Contact_Year) %>%
-  summarise(STATE=max(count)) %>%
-  spread(key=Contact_Year, value=STATE, fill=0)
-TRAL_EH
 
 
 
@@ -212,117 +179,186 @@ TRAL_EH
 #############################################################################
 
 ### EXTRACT AGE AT DEPLOYMENT FROM DATABASE
-### ACCOUNT FOR THE TIME LAG BETWEEN DEPLOYMENT AND FIRST ENCOUNTER IN ENCOUNTER HISTORY
-## BIRDS MARKED AS 'CHICK' PRIOR TO 1994 WILL BE ADULT IN ENCOUNTER HISTORY!
-
-head(ages)
-unique(ages$Age)
-ages$AGE<-ifelse(ages$Age %in% c("Chick","Fledgling"),0,1)
-
-
-minage<-ages %>% arrange(BirdID, Date_Time) %>%
+deploy_age<-contacts %>% arrange(BirdID, Date_Time,Contact_Year) %>%
+  mutate(AGE=ifelse(Age %in% c("Chick","Fledgling"),0,1)) %>%
   group_by(BirdID) %>%
-  summarise(ndepl=length(Age), AGE=min(AGE), Age=first(Age), Sex=first(Sex), Date_Time=first(Date_Time)) %>%
-  mutate(AGE = ifelse(year(Date_Time)<1995,1,AGE))      ## BIRDS MARKED AS 'CHICK' PRIOR TO 1995 WILL BE ADULT IN ENCOUNTER HISTORY!
-head(minage)
+  summarise(MIN_AGE=min(AGE), MAX_AGE=max(AGE), FIRST_AGE=first(Age), FIRST_Date=first(Date_Time), FIRST_YEAR=min(Contact_Year)) %>%
+  mutate(FIRST_AGE=ifelse(FIRST_AGE=="Unknown" & month(FIRST_Date)<5,"Adult", as.character(FIRST_AGE)))  ### unknowns marked before May were not chicks
 
-### INSERT AGE INTO ENCOUNTER HISTORY
-TRAL_EH$AGE<-minage$AGE[match(TRAL_EH$BirdID,minage$BirdID)]
+head(deploy_age)
+dim(deploy_age)
 
+MISSAGE<-deploy_age %>% filter(is.na(FIRST_AGE)) %>%   left_join(bands, by="BirdID") %>%
+  select(BirdID, Band_Number,MIN_AGE,FIRST_Date,FIRST_YEAR)
+dim(MISSAGE)
 
+### FIND MISSING DATA FOR SEASON AND REPLACE BASED ON DATE
 
-### FOR BIRDS WITH NO AGE ASSIGNMENT IN DATABASE
-### TRY TO ASSIGN AGE AT FIRST MARK FROM SIDE OF BODY OR DATE OF MARKING
-
-head(metalside)
-birdage<-metalside %>%   dplyr::filter(SpeciesCode==SP) %>%
-  mutate(minage=if_else(Side_Of_Body=="L" & Side_Of_Body_Status=="Known"
-                                             ,0,1)) %>%
-  mutate(minage=if_else(Contact_Month %in% c(8,9,10,11) & Mark_Status=="Deployed"
-                        ,0,1)) %>%
-  group_by(SpeciesCode,BirdID) %>%
-  summarise(MinAge=min(minage), Date_Time=min(Date_Time)) %>%
-  mutate(MinAge = ifelse(year(Date_Time)<1995,1,MinAge))      ## BIRDS MARKED AS 'CHICK' PRIOR TO 1995 WILL BE ADULT IN ENCOUNTER HISTORY!
-dim(birdage)
-
-
-### INSERT AGE INTO ENCOUNTER HISTORY
-TRAL_EH$AGE[is.na(TRAL_EH$AGE)]<-birdage$MinAge[match(TRAL_EH$BirdID[is.na(TRAL_EH$AGE)],birdage$BirdID)]
-TRAL_EH$AGE[is.na(TRAL_EH$AGE)]<-1 ## fill in the remaining NAs as 'adult'
-
-
-
-
-
-
-
-
-
-
-### CALCULATE PROPORTION OF JUVENILE VS ADULT
-table(TRAL_EH$AGE)
-
-TRAL_EH %>% gather(key='Year',value='Contact',-BirdID,-AGE) %>%
-  group_by(BirdID,AGE) %>%
-  summarise(n_capt=sum(Contact)) %>%
-  #group_by(AGE) %>%
-  #summarise(n_capt=mean(n_capt))
-  
-  ggplot() + geom_histogram(aes(x=n_capt)) + facet_wrap(~AGE)
-
-
-
-
-
-### CALCULATE TIME BETWEEN MARKING AND FIRST RECAPTURE
-## clearly shows that there is a problem in assigning birds ringed as JUVENILE!!
-
-
+contacts<-contacts %>%
+  mutate(Contact_Year=if_else(is.na(Contact_Year),as.integer(year(Date_Time)),Contact_Year)) %>%
+  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==12 & !(Age %in% c("Chick","Fledgling")),Contact_Year+1,as.numeric(Contact_Year))) %>%
+  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==1 & (Age %in% c("Chick","Fledgling")),Contact_Year-1,as.numeric(Contact_Year)))
+dim(contacts)
 head(contacts)
 
-TRAL_EH %>% gather(key='Year',value='Contact',-BirdID,-AGE) %>%
-  filter(Contact==1) %>%
-  mutate(Year=as.numeric(Year)) %>%
-  arrange(BirdID,AGE,Year) %>%
-  mutate(gap=dplyr::lead(Year, k=1)-Year) %>%
-  filter(!is.na(gap)) %>%
-  group_by(BirdID,AGE) %>%
-  summarise(PostDeplLag=first(gap)) %>%
-  
-  ggplot() + geom_histogram(aes(x=PostDeplLag)) + facet_wrap(~AGE)
 
+### ASSIGN AGE TO BIRDS WHERE THIS IS NOT SPECIFIED
+## include a column with continuous age 
 
+contacts<-contacts %>%
+  left_join(deploy_age, by="BirdID") %>%
+  mutate(AGE=ifelse(Age=="Adult",1,ifelse(Age %in% c("Chick","Fledgling"),0,NA))) %>%    ### certain assignments based on provided age
+  mutate(AGE=ifelse(is.na(AGE), ifelse(Sex %in% c("Male","Female"),1,NA),AGE)) %>%       ### inferred assignment from sex info - only adults can be sexed
+  mutate(ContAge=ifelse(FIRST_AGE %in% c("Chick","Fledgling"),Contact_Year-FIRST_YEAR,Contact_Year-FIRST_YEAR+7)) #%>%      ### continuous age since first deployment, at least 7 years for birds marked as 'adult'
 
-### IDENTIFY THE PROBLEM BIRDS AND ENCOUNTER HISTORIES
-suspects<-TRAL_EH %>% gather(key='Year',value='Contact',-BirdID,-AGE) %>%
-  filter(Contact==1) %>%
-  mutate(Year=as.numeric(Year)) %>%
-  arrange(BirdID,AGE,Year) %>%
-  mutate(gap=dplyr::lead(Year, k=1)-Year) %>%
-  filter(!is.na(gap)) %>%
-  group_by(BirdID,AGE) %>%
-  summarise(PostDeplLag=first(gap)) %>%
-  filter(AGE==0, PostDeplLag<5) %>%
-  left_join(metalside[metalside$Mark_Status=="Deployed",], by="BirdID") %>%
-  left_join(minage[,c(1,2,4,5)], by="BirdID") %>%
-  select(BirdID,Contact_Year,Date_Time,AGE,Age,Sex,Side_Of_Body,Side_Of_Body_Status,PostDeplLag,ndepl)
-  
-
-#fwrite(suspects,"TRAL_suspicious_aged_indiv.csv")
+contacts %>% filter(is.na(AGE))
+contacts %>% filter(is.na(ContAge))
 
 
 
 
+#############################################################################
+##   7. REMOVE BIRDS FROM OUTSIDE THE STUDY AREAS ###############
+#############################################################################
+
+########## CREATE A LOOP OVER EVERY BIRD TO CHECK WHETHER THEY WERE EVER RECORDED IN STUDY AREAS
+STUDY_AREAS<- c("Hummocks","Gonydale","Tafelkop")
+allbirds<-unique(contacts$BirdID)
+fixed_contacts<-data.frame()
+
+for (xid in allbirds){
+  xcont<-contacts %>% filter(BirdID==xid) %>% arrange(Date_Time)
+  xcont$INSIDE<-ifelse(xcont$Location %in% STUDY_AREAS,1,0)
+  xcont$INSIDE<-ifelse(xcont$Location == "Not Specified" & xcont$Contact_Year>2014,1,xcont$INSIDE) 
+  if(sum(xcont$INSIDE, na.rm=T)>0){fixed_contacts<-bind_rows(fixed_contacts ,xcont)}
+}
+dim(contacts)
+dim(fixed_contacts)
+length(unique(fixed_contacts$BirdID))
+length(allbirds)
+
+### REMOVE RECORDS FROM BEFORE THE SET START YEAR AND BIRDS FIRST MARKED IN LAST YEAR
+contacts<-fixed_contacts %>%
+  filter(year(Date_Time)>start) %>%
+  filter(ContAge!=1)    ## remove 5 records of unfledged chicks within a few weeks/months of ringing
+dim(contacts)
+unique(contacts$FIRST_AGE)
 
 
-##### FIX AGE ERRORS AND EXPORT ENCOUNTER HISTORY #############################
-wrongage<- suspects %>% mutate(month=month(Date_Time)) %>%
-  filter(month<8)
-TRAL_EH$AGE[TRAL_EH$BirdID %in% wrongage$BirdID]<-1
 
 
-### EXPORT ENCOUNTER HISTORY
-dim(TRAL_EH)
-names(TRAL_EH)
-#try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\SeabirdSurvival"), silent=T)
-fwrite(TRAL_EH[,c(1,22,2:21)],"TRAL_simple_encounter_history_2000_2020.csv")
+#############################################################################
+##   8. CREATE MATRIX OF ENCOUNTERS AND AGES ###############
+#############################################################################
+head(contacts)
+
+### SIMPLE BINARY ENCOUNTER HISTORY FOR CHICKS AND ADULTS
+TRAL_CHICK<- contacts %>% mutate(count=1) %>%
+  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
+  group_by(BirdID,Contact_Year) %>%
+  summarise(STATE=max(count)) %>%
+  spread(key=Contact_Year, value=STATE, fill=0) %>%
+  arrange(BirdID)
+dim(TRAL_CHICK)
+
+TRAL_AD<- contacts %>% mutate(count=1) %>%
+  group_by(BirdID,FIRST_AGE,Contact_Year) %>%
+  summarise(STATE=max(count)) %>%
+  spread(key=Contact_Year, value=STATE, fill=0) %>%
+  filter(FIRST_AGE %in% c("Adult")) %>%    ### filter after spread to ensure that years without any adult contacts (1984, 2003, 2005) are included in matrix
+  ungroup() %>%
+  select(-FIRST_AGE) %>%
+  arrange(BirdID)
+dim(TRAL_AD)
+
+
+### CONVERT TO SIMPLE MATRICES WITHOUT BIRD ID COLUMN
+CH.J<-as.matrix(TRAL_CHICK[,2:dim(TRAL_CHICK)[2]])
+CH.A<-as.matrix(TRAL_AD[,2:dim(TRAL_CHICK)[2]])
+
+
+### IDENTIFY WHICH CHICKS WERE EVER RECAPTURED AND PUT THOSE IN A SEPARATE ENCOUNTER HISTORY
+cap <- apply(CH.J, 1, sum)
+ind <- which(cap >= 2)
+CH.J.R <- CH.J[ind,]    # Juvenile CH recaptured at least once
+CH.J.N <- CH.J[-ind,]   # Juvenile CH never recaptured
+
+
+# FOR THOSE CHICKS THAT WERE RECAPTURED, Remove first capture and add the rest to the adult encounter history
+first <- numeric()
+for (i in 1:dim(CH.J.R)[1]){
+  first[i] <- min(which(CH.J.R[i,]==1))
+}
+CH.J.R1 <- CH.J.R
+for (i in 1:dim(CH.J.R)[1]){
+  CH.J.R1[i,first[i]] <- 0
+}
+
+# Add grown-up juveniles to adults FOR COMPLETE ENCOUNTER HISTORY TO BUILD ADULT MARRAY
+CH.A.m <- rbind(CH.A, CH.J.R1)
+
+
+# Create ENCOUNTER HISTORY matrix for juveniles, ignoring subsequent recaptures
+second <- numeric()
+for (i in 1:dim(CH.J.R1)[1]){
+  second[i] <- min(which(CH.J.R1[i,]==1))
+}
+CH.J.R2 <- matrix(0, nrow = dim(CH.J.R)[1], ncol = dim(CH.J.R)[2])
+for (i in 1:dim(CH.J.R)[1]){
+  CH.J.R2[i,first[i]] <- 1
+  CH.J.R2[i,second[i]] <- 1
+}
+
+
+
+#############################################################################
+##   9. CONVERT TO MARRAY ###############
+#############################################################################
+
+# Function to create a m-array based on capture-histories (CH)
+marray <- function(CH){
+  nind <- dim(CH)[1]
+  n.occasions <- dim(CH)[2]
+  m.array <- matrix(data = 0, ncol = n.occasions+1, nrow = n.occasions)
+  # Calculate the number of released individuals at each time period
+  for (t in 1:n.occasions){
+    m.array[t,1] <- sum(CH[,t])
+  }
+  for (i in 1:nind){
+    pos <- which(CH[i,]!=0)
+    g <- length(pos)
+    for (z in 1:(g-1)){
+      m.array[pos[z],pos[z+1]] <- m.array[pos[z],pos[z+1]] + 1
+    } #z
+  } #i
+  # Calculate the number of individuals that is never recaptured
+  for (t in 1:n.occasions){
+    m.array[t,n.occasions+1] <- m.array[t,1] - sum(m.array[t,2:n.occasions])
+  }
+  out <- m.array[1:(n.occasions-1),2:(n.occasions+1)]
+  return(out)
+}
+
+
+# Create TWO MARRAYS from the capture-histories: one for chicks and one for adults (including those chicks that were ever recaptured)
+
+### ADULT MARRAY
+adult.marray <- marray(CH.A.m)
+
+# Create m-array for the chicks that were ultimately recaptured, but only up to the first recapture (the rest is included in the adult.marray)
+CH.J.R.marray <- marray(CH.J.R2)
+# The last column ought to show the number of juveniles not recaptured again and should all be zeros, since all of them are released as adults
+CH.J.R.marray[,dim(CH.J)[2]] <- 0
+
+# Create the m-array for chicks never recaptured and add it to the recaptured chicks m-array
+CH.J.N.marray <- marray(CH.J.N)
+chick.marray <- CH.J.R.marray + CH.J.N.marray 
+
+
+
+
+#############################################################################
+##   10. SAVE WORKSPACE ###############
+#############################################################################
+setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+save.image("TRAL_IPM_input.marray.RData")
