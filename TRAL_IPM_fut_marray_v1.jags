@@ -196,7 +196,12 @@
         pr.a[t,j] <- 0
       } #j
     } #t
-    
+
+  # Last column: probability of non-recapture
+  for (t in 1:(n.occasions-1)){
+    pr.j[t,n.occasions] <- 1-sum(pr.j[t,1:(n.occasions-1)])
+    pr.a[t,n.occasions] <- 1-sum(pr.a[t,1:(n.occasions-1)])
+  } #t
 
     
     #-------------------------------------------------  
