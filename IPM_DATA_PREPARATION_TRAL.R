@@ -92,6 +92,22 @@ FECUND<-FECUND %>% filter(Colony=="Gonydale")
 ggplot(FECUND, aes(x=Year,y=BREED_SUCC)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') 
 
 
+###   PREPARE A METRIC OF ANNUAL MEAN NEST FAILURE DATE
+nestfail<-nests %>% filter(Year<2021) %>% filter(Species==SP) %>% mutate(count=1) %>%
+  filter(!NestID %in% exclude$NestID) %>%
+  filter(SUCCESS==0) %>%
+  mutate(LastDay=yday(DateLastAlive)) %>%
+  mutate(LastStage=ifelse(is.na(LastStage),ifelse(month(DateLastAlive)>4,"CHIC","INCU"), as.character(LastStage))) %>%
+  group_by(Year,LastStage) %>%
+  summarise(n=sum(count)) %>% #,LDmean=mean(LastDay, na.rm=T), LDmedian=median(LastDay, na.rm=T)) %>%
+  filter(!is.na(LastStage)) %>%
+  filter(!(LastStage=="FAIL")) %>%
+  spread(key=LastStage, value=n) %>%
+  mutate(tot=sum(CHIC,INCU,na.rm=T)) %>%
+  mutate(propINCU=INCU/tot)
+  
+
+
 
 #############################################################################
 ##   4. PREPARE THE POPULATION COUNT DATA FROM COUNT RECORDS ################
