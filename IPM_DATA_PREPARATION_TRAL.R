@@ -447,7 +447,7 @@ FAIL.PROP<-nests %>% filter(SUCCESS==0) %>% #filter(Year==2011) %>%
   mutate(LATEFAIL=if_else(yday(DateLastAlive)>CUTOFF,1,0)) %>%
   group_by(Year) %>%
   summarise(prop.late=mean(LATEFAIL, na.rm=T)) %>%
-  mutate(prop.late=if_else(prop.late==1,NA,prop.late))
+  mutate(prop.late=ifelse(prop.late==1,NA,prop.late))
 
 
 #############################################################################
