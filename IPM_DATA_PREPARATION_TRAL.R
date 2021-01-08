@@ -97,7 +97,7 @@ nestfail<-nests %>% filter(Year<2021) %>% filter(Species==SP) %>% mutate(count=1
   filter(!NestID %in% exclude$NestID) %>%
   filter(SUCCESS==0) %>%
   mutate(LastDay=yday(DateLastAlive)) %>%
-  mutate(LastStage=ifelse(is.na(LastStage),ifelse(month(DateLastAlive)>4,"CHIC","INCU"), as.character(LastStage))) %>%
+  mutate(LastStage=if_else(is.na(LastStage),ifelse(month(DateLastAlive)>4,"CHIC","INCU"), as.character(LastStage))) %>%
   group_by(Year,LastStage) %>%
   summarise(n=sum(count)) %>% #,LDmean=mean(LastDay, na.rm=T), LDmedian=median(LastDay, na.rm=T)) %>%
   filter(!is.na(LastStage)) %>%
@@ -372,9 +372,86 @@ chick.marray <- CH.J.R.marray + CH.J.N.marray
 
 
 
+#################################################################################################################
+##   10. ATTEMPT TO QUANTIFY THE LAST NEST ALIVE DATE FOR BIRDS TO STILL RETURN IN FOLLOWING YEAR ###############
+#################################################################################################################
+
+### EXTRACT UNSUCCESSFUL NESTS
+failures<- nests %>% filter(SUCCESS==0) %>% filter(Species==SP) %>%
+  mutate(DateLastAlive=if_else(year(DateLastAlive)<Year,DateLastChecked,DateLastAlive)) ## avoid days >300 for nests that failed in December
+
+### SELECT INDIVIDUALS THAT WERE RECORDED AT THESE UNSUCCESSFUL NESTS
+fail.ind<-contacts %>% filter(Nest_Description %in% unique(failures$Nest_label))
+
+### EXTRACT ALL CONTACTS OF INDIVIDUALS ASSOCIATED WITH ANY FAILED NEST
+nestfail.contacts<-contacts %>% filter(BirdID %in% unique(fail.ind$BirdID)) %>% group_by(BirdID, Contact_Year) %>%
+  summarise(SEEN=n()) %>%
+  arrange(BirdID, Contact_Year) %>%
+  rename(Year=Contact_Year) 
+
+### EXTRACT ALL INDIVIDUALS ASSOCIATED WITH ALL FAILED NESTS
+fail.nest.ind<-fail.ind %>% rename(Nest_label=Nest_Description, Year=Contact_Year) %>%
+  left_join(failures, by=c("Year","Nest_label")) %>%
+  group_by(Nest_label,Year,LastStage,DateLastAlive,DateLastChecked, BirdID) %>%
+  summarise(nest.visits=n())
+
+
+### COMBINE THE ABOVE IN A FULL MATRIX AND EXTRACT RECORDS BASED ON PREVIOUS YEAR NEST FAILURE
+
+TRAL_NESTFAIL_MATRIX<- expand.grid(BirdID=unique(fail.ind$BirdID), Year=seq(2007,2021,1)) %>%
+  left_join(fail.nest.ind, by=c("Year","BirdID")) %>%
+  left_join(nestfail.contacts, by=c("Year","BirdID")) %>%
+  mutate(SEEN=ifelse(is.na(SEEN),0,SEEN)) %>%
+  mutate(SEEN=ifelse(SEEN>1,1,SEEN)) %>%
+  arrange(BirdID,Year) %>%
+  mutate(prevNest=dplyr::lag(Nest_label),prevStage=dplyr::lag(LastStage),prevAlive=yday(dplyr::lag(DateLastAlive)),prevCheck=yday(dplyr::lag(DateLastChecked))) %>%
+  filter(!is.na(prevNest)) %>%
+  arrange(BirdID,Year) %>%
+  select(BirdID,Year,SEEN,Nest_label,LastStage,DateLastAlive,prevNest,prevStage,prevAlive,prevCheck)
+dim(TRAL_NESTFAIL_MATRIX)
+
+
+### CALCULATE RETURN PROBABILITY BASED ON DATE LAST SEEN ALIVE
+ret.mod<-glm(SEEN~prevAlive,TRAL_NESTFAIL_MATRIX, family=binomial)
+TRAL_NESTFAIL_MATRIX$pred<-predict(ret.mod,newdat=TRAL_NESTFAIL_MATRIX, type="response")
+ggplot(TRAL_NESTFAIL_MATRIX) + geom_point(aes(x=prevAlive,y=SEEN)) + 
+  geom_line(aes(x=prevAlive,y=pred), colour='darkred', size=1.5) +
+  ylab("Returning to Gough") + 
+  xlab("Day when last alive in previous year") + 
+  theme(panel.background=element_rect(fill="white", colour="black"),  
+        axis.text.y=element_text(size=18, color="black"), 
+        axis.text.x=element_text(size=14, color="black", angle=45, vjust=0.5),  
+        axis.title=element_text(size=20),  
+        strip.text.x=element_text(size=18, color="black"),  
+        strip.background=element_rect(fill="white", colour="black"), 
+        legend.position=c(0.15,0.9), 
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        panel.border = element_blank()) 
+
+
+### TROUBLESHOOT QUESTIONABLE RECORDS
+TRAL_NESTFAIL_MATRIX %>% filter(SEEN==1) %>% filter(prevAlive>250)
+
+
+### EXTRACT THE DATE WHEN RETURN PROBABILITY DROPS BELOW 50%
+CUTOFF <- approx(x = ret.mod$fitted.values, y = TRAL_NESTFAIL_MATRIX$prevAlive[!is.na(TRAL_NESTFAIL_MATRIX$prevAlive)], xout=0.5)$y
+
+
+### CALCULATE PROPORTION OF NESTS THAT FAIL AFTER THAT DATE
+head(nests)
+
+FAIL.PROP<-nests %>% filter(SUCCESS==0) %>% #filter(Year==2011) %>%
+  mutate(DateLastAlive=if_else(year(DateLastAlive)<Year,DateLastChecked,DateLastAlive)) %>% ## avoid days >300 for nests that failed in December
+  mutate(DateLastAlive=if_else(is.na(DateLastAlive),DateLastChecked,DateLastAlive)) %>% ## avoid missing data for 2006-2009 and 2011
+  mutate(LATEFAIL=if_else(yday(DateLastAlive)>CUTOFF,1,0)) %>%
+  group_by(Year) %>%
+  summarise(prop.late=mean(LATEFAIL, na.rm=T)) %>%
+  mutate(prop.late=if_else(prop.late==1,NA,prop.late))
+
 
 #############################################################################
-##   10. SAVE WORKSPACE ###############
+##   11. SAVE WORKSPACE ###############
 #############################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 save.image("TRAL_IPM_input.marray.RData")
