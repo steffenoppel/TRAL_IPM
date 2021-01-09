@@ -422,8 +422,6 @@ ggplot(TRAL_NESTFAIL_MATRIX) + geom_point(aes(x=prevAlive,y=SEEN)) +
         axis.text.y=element_text(size=18, color="black"), 
         axis.text.x=element_text(size=14, color="black", angle=45, vjust=0.5),  
         axis.title=element_text(size=20),  
-        strip.text.x=element_text(size=18, color="black"),  
-        strip.background=element_rect(fill="white", colour="black"), 
         legend.position=c(0.15,0.9), 
         panel.grid.major = element_blank(),  
         panel.grid.minor = element_blank(),  
@@ -441,13 +439,60 @@ CUTOFF <- approx(x = ret.mod$fitted.values, y = TRAL_NESTFAIL_MATRIX$prevAlive[!
 ### CALCULATE PROPORTION OF NESTS THAT FAIL AFTER THAT DATE
 head(nests)
 
-FAIL.PROP<-nests %>% filter(SUCCESS==0) %>% #filter(Year==2011) %>%
+FAIL.PROP<-nests %>% #filter(SUCCESS==0) %>% #filter(Year==2011) %>%
+  mutate(DateLastAlive=if_else(SUCCESS==1,ymd_hms(paste(Year,"12","01 12:00:00",sep="-")),DateLastAlive)) %>%
   mutate(DateLastAlive=if_else(year(DateLastAlive)<Year,DateLastChecked,DateLastAlive)) %>% ## avoid days >300 for nests that failed in December
   mutate(DateLastAlive=if_else(is.na(DateLastAlive),DateLastChecked,DateLastAlive)) %>% ## avoid missing data for 2006-2009 and 2011
   mutate(LATEFAIL=if_else(yday(DateLastAlive)>CUTOFF,1,0)) %>%
   group_by(Year) %>%
-  summarise(prop.late=mean(LATEFAIL, na.rm=T)) %>%
-  mutate(prop.late=ifelse(prop.late==1,NA,prop.late))
+  summarise(prop.late=mean(LATEFAIL, na.rm=T), mean.last.alive=mean(yday(DateLastAlive), na.rm=T), median.last.alive=median(yday(DateLastAlive), na.rm=T)) %>%
+  mutate(prop.late=ifelse(prop.late==1,NA,prop.late)) %>%
+  bind_rows(data.frame(Year=2005, prop.late=NA)) %>%
+  arrange(Year)
+
+
+
+### SIMPLE EXPLORATION WHETHER FAIL PROP EXPLAINS SEQUENCE OF COUNT DATA
+### PREPARE COUNT DATA AS IN IPM POPULATION TREND ######
+TRAL.pop<-POPSIZE
+TRAL.pop[14,4]<-136   ### number of nests monitored in Gonydale that year
+TRAL.pop<-TRAL.pop %>% gather(key='Site', value='Count',-Year) %>%
+  filter(Year>2003) %>%
+  mutate(Site=ifelse(Site %in% c('GP Valley','West Point'),'GP Valley',Site)) %>%
+  mutate(Site=ifelse(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',Site)) %>%
+  group_by(Year,Site) %>%
+  summarise(Count=sum(Count, na.rm=T)) %>%
+  mutate(Count=ifelse(Count==0,NA,Count)) %>%
+  spread(key=Site, value=Count)
+TRAL.props<-prop.table(as.matrix(TRAL.pop[,2:9]),1)
+mean.props<-apply(TRAL.props[c(1,3:7,9:13,15:17),],2,mean) ## for start in 2004
+TRAL.pop$prop.counted<-0
+for (l in 1:length(TRAL.pop$Year)){
+  TRAL.pop$prop.counted[l]<-sum(mean.props[which(!is.na(TRAL.pop[l,2:9]))])
+}
+TRAL.pop$tot<-rowSums(TRAL.pop[,2:9], na.rm=T)
+
+### CALCULATE CHANE FROM ONE YEAR TO NEXT
+TRAL.pop %>% ungroup() %>%
+  mutate(tot=ifelse(Year==2011,NA,tot)) %>%
+  mutate(change=((tot/prop.counted)-(dplyr::lag(tot)/dplyr::lag(prop.counted)))/(dplyr::lag(tot)/dplyr::lag(prop.counted))) %>%
+  select(Year, tot,prop.counted,change) %>%
+  left_join(FAIL.PROP, by="Year") %>%
+  gather(key="Prev.breed.measure",value="Metric",-Year,-tot,-change,-prop.counted) %>%
+
+  ggplot() + geom_point(aes(x=Metric,y=change), size=2, col='darkred') + 
+  geom_smooth(aes(x=Metric,y=change), col="darkblue",method='lm') +
+    facet_wrap(~Prev.breed.measure, ncol=1, scales="free_x") +
+  ylab("Proportional change in N pairs") + 
+  xlab("Measure of previous breeding season end") + 
+  theme(panel.background=element_rect(fill="white", colour="black"),  
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),  
+        strip.text.x=element_text(size=18, color="black"),  
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        panel.border = element_blank()) 
 
 
 #############################################################################
