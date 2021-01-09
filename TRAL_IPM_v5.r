@@ -33,6 +33,8 @@
 
 ## 9 JANUARY 2021: major revision to population process trying to simplify the quantities that explain which birds return to island
 
+## CONVERGENCE PROBLEMS: NEED TO TRY SSM FOR TOT POP SIZE (rather than by site) AND RECRUIT AT AGES BEFORE 9
+
 
 library(tidyverse)
 library(lubridate)
@@ -522,9 +524,9 @@ nc <- 3
 
 
 # RUN THE FOUR SCENARIOS {took 20 hours for niter=150000)
-TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_simplified.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T,n.iter = ni)
-                    Rhat.limit=1.5, max.iter=50000)  
+TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_simplified.jags",
+                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
+                    Rhat.limit=1.5, max.iter=25000)  
 
 
 
