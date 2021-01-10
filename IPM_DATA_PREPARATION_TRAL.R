@@ -372,6 +372,41 @@ chick.marray <- CH.J.R.marray + CH.J.N.marray
 
 
 
+### CALCULATE THE PROPORTION OF CHICKS RECRUITING AT A CERTAIN AGE
+
+recruit.age<-function(CH){
+  n.occasions <- dim(CH)[2]-1
+  total<-as.numeric()
+  recruit.mat<- matrix(data = 0, ncol = n.occasions, nrow = n.occasions-1)
+  # Calculate the age proportion of returned individuals at each time period
+  for (t in 1:(n.occasions-1)){
+    total[t] <- sum(CH[t,])
+    for (col in (t+1):n.occasions){
+      recruit.mat[t,col-t]<- CH[t,col]
+    }
+  }
+  return(list(REC=recruit.mat,TOT=total))
+}
+
+RECRUIT.AGE.MAT<-recruit.age(CH.J.R.marray)
+RECRUIT.AGE<-data.frame(age=seq(1,dim(RECRUIT.AGE.MAT$REC)[2],1),N=apply(RECRUIT.AGE.MAT$REC,2,sum)) %>%
+  mutate(prop=N/sum(RECRUIT.AGE.MAT$TOT))
+
+sum(RECRUIT.AGE.MAT$TOT)
+sum(RECRUIT.AGE$N)
+
+ggplot(RECRUIT.AGE) + geom_bar(aes(x=age,y=prop),stat='identity', fill='cornflowerblue') + 
+  ylab("Proportion of TRAL first seen on Gough") + 
+  xlab("Age in years") + 
+  theme(panel.background=element_rect(fill="white", colour="black"),  
+        axis.text=element_text(size=16, color="black"),  
+        axis.title=element_text(size=18),
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        panel.border = element_blank()) 
+
+
+
 #################################################################################################################
 ##   10. ATTEMPT TO QUANTIFY THE LAST NEST ALIVE DATE FOR BIRDS TO STILL RETURN IN FOLLOWING YEAR ###############
 #################################################################################################################
