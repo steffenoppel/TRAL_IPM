@@ -141,7 +141,7 @@ min(which(!is.na(match(as.numeric(names(TRAL_CHICK)[2:44]),TRAL.pop$Year))))
 # SPECIFY MODEL IN JAGS
 #########################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-sink("TRAL_IPM_marray_simplified.jags")
+sink("TRAL_IPM_marray_simplified_v2.jags")
 cat("
 
   
@@ -158,6 +158,7 @@ cat("
     # - v4 includes 3 scenarios of future projection: no change, improved fecundity, reduced adult survival
     # - marray_v1 uses marray for survival estimation to speed up computation time
     # - marray_simplified adjusts population process to make number of bird returning completely random
+    # - marray_simplified_v2 further simplifies return process to tie to recapture probability
     # -------------------------------------------------
     
     #-------------------------------------------------  
@@ -171,7 +172,7 @@ cat("
     
     for (t in 1:T){  
       ann.fec[t] ~ dunif(0.05,0.65) ## dnorm(0.32,10) T(0.001,0.999)        ## Informative Priors on fecundity based on Wanless et al 2009
-      skip.prob[t] ~ dunif(0.05,0.95) ## dunif(0.22,0.32) T(0.001,0.999)           ## PRIOR FOR ADULT FAILED BREEDER SKIPPING PROBABILITY from Wanless et al 2009
+      #skip.prob[t] ~ dunif(0.05,0.95) ## dunif(0.22,0.32) T(0.001,0.999)           ## PRIOR FOR ADULT FAILED BREEDER SKIPPING PROBABILITY from Wanless et al 2009
     } #t
 
     
@@ -240,27 +241,25 @@ cat("
       N2[tt] ~ dbin(mean.phi.juv, round(N1[tt-1]))                                                      ### number of 2-year old survivors
       N3[tt] ~ dbin(mean.phi.juv, round(N2[tt-1]))                                                       ### number of 3-year old survivors
       N4[tt] ~ dbin(mean.phi.juv, round(N3[tt-1]))                                                       ### number of 4-year old survivors
-      N5[tt] ~ dbin(phi.ad[tt+25], round(N4[tt-1]))                                                       ### number of 5-year old survivors
-      N6[tt] ~ dbin(phi.ad[tt+25], round(N5[tt-1]))                                                       ### number of 6-year old survivors
-      N7[tt] ~ dbin(phi.ad[tt+25], round(N6[tt-1]))                                                       ### number of 7-year old survivors
-      N8[tt] ~ dbin(phi.ad[tt+25], round(N7[tt-1]))                                                       ### number of 8-year old survivors
-      N9[tt] ~ dbin(phi.ad[tt+25], round(N8[tt-1]))                                                       ### number of 9-year old survivors
-    
-
+      N.notrecruited.surv[tt] ~ dbin(phi.ad[tt+25], round(N.notrecruited[tt-1]))                        ### number of older immature survivors that have not recruited 
+      N.recruits[tt] ~ dbin(p.juv[tt+26], round(N.notrecruited.surv[tt]+N4[tt]))                             ### number of this years recruiters
+      N.notrecruited[tt] <-round(N.notrecruited.surv[tt]+N4[tt]-N.recruits[tt])                         ### number of birds not yet recruited at the end of this year
  
       ## THE BREEDING POPULATION ##
       # Ntot.breed comprised of first-time breeders, previous skippers, and previous unsuccessful breeders
-
-      N.prev.succ[tt] ~ dbin(ann.fec[tt-1], round(Ntot.breed[tt-1]))                    ### number of successful breeders from previous year
-      N.prev.succ.atsea[tt] ~ dbin(phi.ad[tt+25], N.prev.succ[tt])                     ### previous year's successful breeders at sea
-
-      N.prev.unsucc.breed[tt] <- round(Ntot.breed[tt-1]-N.prev.succ[tt])
-      N.prev.unsucc.return[tt] ~ dbin(skip.prob[tt], N.prev.unsucc.breed[tt])             ### previous year's unsuccessful breeders that are returning to breed
-      N.prev.unsucc.atsea[tt] ~ dbin(phi.ad[tt+25], (N.prev.unsucc.breed[tt]-N.prev.unsucc.return[tt])) ### previous year's unsuccessful breeders that are staying at sea
-
-      N.breed.ready[tt]<- round(N.prev.unsucc.return[tt]+ N.prev.unsucc.atsea[tt-1]+N.prev.succ.atsea[tt-1]+N9[tt-1])       ### number of available breeders is failed breeders from previous year plus failed and successful breeders from 2 years ago plus recruits (N9)
-      Ntot.breed[tt] ~ dbin(phi.ad[tt+25], N.breed.ready[tt])                         ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
-
+      # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
+      #N.prev.succ[tt] ~ dbin(ann.fec[tt-1], round(Ntot.breed[tt-1]))                    ### number of successful breeders from previous year
+      #N.prev.succ.atsea[tt] ~ dbin(phi.ad[tt+25], N.prev.succ[tt])                     ### previous year's successful breeders at sea
+      #N.prev.unsucc.breed[tt] <- round(Ntot.breed[tt-1]-N.prev.succ[tt])
+      #N.prev.unsucc.return[tt] ~ dbin(skip.prob[tt], N.prev.unsucc.breed[tt])             ### previous year's unsuccessful breeders that are returning to breed
+      #N.prev.unsucc.atsea[tt] ~ dbin(phi.ad[tt+25], (N.prev.unsucc.breed[tt]-N.prev.unsucc.return[tt])) ### previous year's unsuccessful breeders that are staying at sea
+      #N.breed.ready[tt]<- round(N.prev.unsucc.return[tt]+ N.prev.unsucc.atsea[tt-1]+N.prev.succ.atsea[tt-1]+N.recruits[tt-1])       ### number of available breeders is failed breeders from previous year plus failed and successful breeders from 2 years ago plus recruits (N9)
+      #Ntot.breed[tt] ~ dbin(phi.ad[tt+25], N.breed.ready[tt])                         ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+      
+      N.ad.surv[tt] ~ dbin(phi.ad[tt+25], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
+      N.breed.ready[tt] ~ dbin(p.ad[tt+26], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
+      Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
+      N.atsea[tt] <- round(N.ad.surv[tt]-N.breed.ready[tt])                     ### potential breeders that remain at sea    
 
     } # tt
     
@@ -273,14 +272,11 @@ cat("
     N2[1]<-round(N1[1]*mean.phi.juv)
     N3[1]<-round(N2[1]*mean.phi.juv)
     N4[1]<-round(N3[1]*mean.phi.juv)
-    N5[1]<-round(N4[1]*mean.phi.ad)
-    N6[1]<-round(N5[1]*mean.phi.ad)
-    N7[1]<-round(N6[1]*mean.phi.ad)
-    N8[1]<-round(N7[1]*mean.phi.ad)
-    N9[1]<-round(N8[1]*mean.phi.ad)
-    N.prev.unsucc.atsea[1] ~ dunif(200,700)
-    N.prev.succ.atsea[1] ~ dunif(300,600)
-
+    N.notrecruited[1] <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
+    
+    #N.prev.unsucc.atsea[1] ~ dunif(200,700)
+    #N.prev.succ.atsea[1] ~ dunif(300,600)
+    N.atsea[1] ~ dunif(100,1000)
 
     # -------------------------------------------------        
     # 2.2. Observation process for population counts: state-space model of annual counts
@@ -384,23 +380,24 @@ for(scen in 1:n.scenarios){
     N2.f[scen,1] ~ dbin(mean.phi.juv, max(1,round(N1[T])))                                                      ### number of 2-year old survivors
     N3.f[scen,1] ~ dbin(mean.phi.juv, max(1,round(N2[T])))                                                       ### number of 3-year old survivors
     N4.f[scen,1] ~ dbin(mean.phi.juv, max(1,round(N3[T])))                                                       ### number of 4-year old survivors
-    N5.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N4[T])))                                                       ### number of 5-year old survivors
-    N6.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N5[T])))                                                       ### number of 6-year old survivors
-    N7.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N6[T])))                                                       ### number of 7-year old survivors
-    N8.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N7[T])))                                                       ### number of 8-year old survivors
-    N9.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N8[T])))                                                       ### number of 9-year old survivors
+    # N5.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N4[T])))                                                       ### number of 5-year old survivors
+    # N6.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N5[T])))                                                       ### number of 6-year old survivors
+    # N7.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N6[T])))                                                       ### number of 7-year old survivors
+    # N8.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N7[T])))                                                       ### number of 8-year old survivors
+    # N9.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, max(1,round(N8[T])))                                                       ### number of 9-year old survivors
     carr.capacity[scen,1]<-2500
 
-    N.prev.succ.f[scen,1] ~ dbin(fut.fec.change[scen]*mean.fec, max(1,round(Ntot.breed[T-1])))                     ### number of successful breeders from previous year
-    N.prev.succ.atsea.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, N.prev.succ.f[scen,1])                     ### previous year's successful breeders at sea
-    
-    N.prev.unsucc.breed.f[scen,1] <- round(Ntot.breed[T-1]-N.prev.succ.f[scen,1])
-    N.prev.unsucc.return.f[scen,1] ~ dbin(mean.skip, N.prev.unsucc.breed.f[scen,1])             ### previous year's unsuccessful breeders that are returning to breed
-    N.prev.unsucc.atsea.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, (N.prev.unsucc.breed.f[scen,1]-N.prev.unsucc.return.f[scen,1])) ### previous year's unsuccessful breeders that are staying at sea
-    
-    N.breed.ready.f[scen,1]<- round(N.prev.unsucc.return.f[scen,1]+ N.prev.unsucc.atsea[T-1]+N.prev.succ.atsea[T-1]+N9[T-1])       ### number of available breeders is failed breeders from previous year plus failed and successful breeders from 2 years ago plus recruits (N9)
+    # N.prev.succ.f[scen,1] ~ dbin(fut.fec.change[scen]*mean.fec, max(1,round(Ntot.breed[T-1])))                     ### number of successful breeders from previous year
+    # N.prev.succ.atsea.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, N.prev.succ.f[scen,1])                     ### previous year's successful breeders at sea
+    # 
+    # N.prev.unsucc.breed.f[scen,1] <- round(Ntot.breed[T-1]-N.prev.succ.f[scen,1])
+    # N.prev.unsucc.return.f[scen,1] ~ dbin(mean.skip, N.prev.unsucc.breed.f[scen,1])             ### previous year's unsuccessful breeders that are returning to breed
+    # N.prev.unsucc.atsea.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, (N.prev.unsucc.breed.f[scen,1]-N.prev.unsucc.return.f[scen,1])) ### previous year's unsuccessful breeders that are staying at sea
+    # 
+    # N.breed.ready.f[scen,1]<- round(N.prev.unsucc.return.f[scen,1]+ N.prev.unsucc.atsea[T-1]+N.prev.succ.atsea[T-1]+N9[T-1])       ### number of available breeders is failed breeders from previous year plus failed and successful breeders from 2 years ago plus recruits (N9)
     Ntot.breed.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, N.breed.ready.f[scen,1])                         ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
-    
+    N.atsea.f[scen,1] ~ dbin(fut.surv.change[scen]*mean.phi.ad, N.breed.ready.f[scen,1])                         ### number of potential old breeders is the number of survivors from previous year breeders and nonbreeders
+      
 
    
     for (tt in 2:FUT.YEAR){
