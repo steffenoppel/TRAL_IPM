@@ -64,6 +64,7 @@ TRAL.pop<-POPSIZE ##fread("TRAL_INCU_counts_2001_2020.csv")
 head(TRAL.pop)
 names(TRAL.pop)
 TRAL.pop[14,4]<-136   ### number of nests monitored in Gonydale that year
+TRAL.pop[11,4]<-136   ### number of nests monitored in Gonydale that year must be larger than the number of chicks observed (226)
 
 ## COMBINE SITES THAT WERE AMBIGUOUSLY DEFINED OVER TIME 
 TRAL.pop<-TRAL.pop %>% gather(key='Site', value='Count',-Year) %>%
@@ -117,6 +118,8 @@ TRAL.chick<-TRAL.chick %>% gather(key='Site', value='Count',-Year) %>%
   summarise(Count=sum(Count, na.rm=T)) %>%
   mutate(Count=ifelse(Count==0,NA,Count)) %>%
   spread(key=Site, value=Count)
+TRAL.chick[8,4]<-CHICKCOUNT[11,4] ### in 2011 no adults were counted in Green hill and Hummocks, so we cannot add up the chicks across those 3 sites
+
 
 TRAL.chick$tot<-rowSums(TRAL.chick[,2:9], na.rm=T)
 #TRAL.chick$tot[c(3,13,19)]<-NA   ## when start in 2001
@@ -127,6 +130,19 @@ J<- as.matrix(TRAL.chick[,2:9])
 ### specify constants for JAGS
 n.years<-dim(R)[1]		## defines the number of years
 n.sites<-dim(R)[2]    ## defines the number of study areas
+
+
+### UPDATE 10 January 2021 - reduce R and J to vectors of sum across the study areas for which we have data
+
+Jlong<-TRAL.chick %>% gather(key='Site', value="chicks",-Year)
+PROD.DAT<-TRAL.pop %>% select(-prop.counted,-tot) %>% gather(key='Site', value="adults",-Year) %>%
+  left_join(Jlong, by=c("Year","Site")) %>%
+  mutate(include=ifelse(is.na(adults+chicks),0,1)) %>%
+  filter(include==1) %>%
+  group_by(Year) %>%
+  summarise(J=sum(chicks),R=sum(adults))
+
+
 
 
 
@@ -300,13 +316,15 @@ cat("
     # -------------------------------------------------        
     # 2.3. Likelihood for fecundity: Logistic regression from the number of surveyed broods
     # -------------------------------------------------
-    for (s in 1:n.sites){			### start loop over every study area
-      for (t in 1:(T-1)){
-        J[t,s] ~ dpois(rho.fec[t,s])
-        rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
-      } #	close loop over every year in which we have fecundity data
-    }		## end site loop
-    
+    # for (s in 1:n.sites){			### start loop over every study area
+    #   for (t in 1:(T-1)){
+    #     J[t,s] ~ dpois(rho.fec[t,s])
+    #     rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
+    #   } #	close loop over every year in which we have fecundity data
+    # }		## end site loop
+    for (t in 1:(T)){
+      J[t] ~ dbin(ann.fec[t], R[t])
+    } #	close loop over every year in which we have fecundity data
     
     
     
@@ -462,15 +480,14 @@ jags.data <- list(marr.j = chick.marray,
                   r.a=apply(adult.marray,1,sum),
                   
                   ### count data
+                  n.sites=n.sites,
                   T = n.years,
                   prop.sites=mean.props,
                   y.count=R,
                   
                   ### breeding success data
-                  n.sites=n.sites,
-                  J=J,
-                  R=R,
-                  late.fail=FAIL.PROP$prop.late,
+                  J=PROD.DAT$J,
+                  R=PROD.DAT$R,
                   
                   ### longline effort data
                   #longline=longlineICCAT,
@@ -504,16 +521,16 @@ parameters <- c("ann.fec","mean.phi.ad","mean.phi.juv","mean.fec","mean.skip","m
 
 # MCMC settings
 ni <- 15
-nt <- 2
+nt <- 5
 nb <- 5
 nc <- 3
 
 
 
-# RUN THE FOUR SCENARIOS {took 20 hours for niter=150000)
+# RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
 TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_simplified_v2.jags",
                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.5, max.iter=25000)  
+                    Rhat.limit=1.5, max.iter=150000)  
 
 
 

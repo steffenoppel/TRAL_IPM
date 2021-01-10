@@ -153,13 +153,15 @@
     # -------------------------------------------------        
     # 2.3. Likelihood for fecundity: Logistic regression from the number of surveyed broods
     # -------------------------------------------------
-    for (s in 1:n.sites){			### start loop over every study area
-      for (t in 1:(T-1)){
-        J[t,s] ~ dpois(rho.fec[t,s])
-        rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
-      } #	close loop over every year in which we have fecundity data
-    }		## end site loop
-    
+    # for (s in 1:n.sites){			### start loop over every study area
+    #   for (t in 1:(T-1)){
+    #     J[t,s] ~ dpois(rho.fec[t,s])
+    #     rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
+    #   } #	close loop over every year in which we have fecundity data
+    # }		## end site loop
+    for (t in 1:(T)){
+      J[t] ~ dbin(ann.fec[t], R[t])
+    } #	close loop over every year in which we have fecundity data
     
     
     
