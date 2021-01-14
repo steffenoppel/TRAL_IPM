@@ -32,8 +32,9 @@
 ## none of the breed.fail metrics explains pop change from one year to the next - need to keep this totally random
 
 ## 9 JANUARY 2021: major revision to population process trying to simplify the quantities that explain which birds return to island
+## 10-12 Jan 2021: simplified initial values and adjusted priors - MODEL CONVERGED BUT has very high juvenile survival bounded by priors on p and phi
 
-## CONVERGENCE PROBLEMS: NEED TO TRY SSM FOR TOT POP SIZE (rather than by site) AND RECRUIT AT AGES BEFORE 9
+## 13 January 2021: re-inserted carrying capacity into future projections to prevent pop sizes >5000
 
 
 library(tidyverse)
@@ -160,7 +161,7 @@ TRAL.pop$Year[1]
 # SPECIFY MODEL IN JAGS
 #########################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-sink("TRAL_IPM_marray_simplified_v2.jags")
+sink("TRAL_IPM_marray_simplified_v3.jags")
 cat("
 
   
@@ -178,6 +179,7 @@ cat("
     # - marray_v1 uses marray for survival estimation to speed up computation time
     # - marray_simplified adjusts population process to make number of bird returning completely random
     # - marray_simplified_v2 further simplifies return process to tie to recapture probability
+    # - marray_simplified_v3 includes carrying capacity for future projections and re-inserts breeding success
     # -------------------------------------------------
     
     #-------------------------------------------------  
@@ -222,7 +224,7 @@ cat("
 
     
     ### SURVIVAL PROBABILITY
-    mean.phi.juv ~ dunif(0, 1)             # Prior for mean juvenile survival
+    mean.phi.juv ~ dunif(0.4, 0.9)             # Prior for mean juvenile survival
     mean.phi.ad ~ dunif(0.7, 1)             # Prior for mean adult survival - should be higher than 70%
     mu.juv <- log(mean.phi.juv / (1-mean.phi.juv)) # Logit transformation
     mu.ad <- log(mean.phi.ad / (1-mean.phi.ad)) # Logit transformation
@@ -287,13 +289,14 @@ cat("
     
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
+    ## ADJUSTED BASED ON PAST POPULATION SIZES
     Ntot.breed[1] ~ dunif(1500,2000) ###   ### sum of counts is 2400, but we take average over 3 years because 2001 was an outlier year
     JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
-    N1[1]<-round(JUV[1]*mean.phi.juv)
-    N2[1]<-round(N1[1]*mean.phi.juv)
-    N3[1]<-round(N2[1]*mean.phi.juv)
-    N4[1]<-round(N3[1]*mean.phi.juv)
-    N.notrecruited[1] <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
+    N1[1] ~ dunif(200,700)  ##<-round(JUV[1]*mean.phi.juv)
+    N2[1] ~ dunif(100,600)  ##<-round(N1[1]*mean.phi.juv)
+    N3[1] ~ dunif(300,800)  ## very large number of birds due to 2400 breeders in 2001 <-round(N2[1]*mean.phi.juv)
+    N4[1] ~ dunif(100,400)  ##<-round(N3[1]*mean.phi.juv)
+    N.notrecruited[1] ~ dunif(50,800)  ### all birds not recruited, including those from 1999 bumper year <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
     
     #N.prev.unsucc.atsea[1] ~ dunif(200,700)
     #N.prev.succ.atsea[1] ~ dunif(300,600)
@@ -438,7 +441,7 @@ for(scen in 1:n.scenarios){
     ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[scen]*mean.phi.ad, round(Ntot.breed.f[scen,tt-1]+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.breed.ready.f[scen,tt] ~ dbin(mean.p.ad, N.ad.surv.f[scen,tt])                  ### number of available breeders is proportion of survivors that returns
-      Ntot.breed.f[scen,tt]<- round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt])              ### number of counted breeders is sum of old breeders returning and first recruits
+      Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt])                     ### potential breeders that remain at sea    
 
 
@@ -502,7 +505,7 @@ jags.data <- list(marr.j = chick.marray,
 
 # Initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 1),
-                         mean.phi.juv = runif(1, 0, 1),
+                         mean.phi.juv = runif(1, 0.4, 0.9),
                          mean.p = runif(1, 0, 1),
                          Ntot.breed= c(runif(1, 1500, 2000),rep(NA,n.years-1)),
                          #bycatch = rnorm(1,0,0.01),
@@ -520,17 +523,17 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 1),
 parameters <- c("ann.fec","mean.phi.ad","mean.phi.juv","mean.fec","mean.skip","mean.p.ad","mean.p.juv","pop.growth.rate","fut.growth.rate","Ntot.breed","Ntot.breed.f")  
 
 # MCMC settings
-ni <- 15
-nt <- 5
-nb <- 5
+ni <- 250000
+nt <- 4
+nb <- 50000
 nc <- 3
 
 
 
 # RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
-TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_simplified_v2.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.5, max.iter=150000)  
+TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_simplified_v3.jags",
+                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
+                    #Rhat.limit=1.5, max.iter=150000)  
 
 
 
@@ -539,6 +542,8 @@ TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Goug
 #########################################################################
 # SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
 #########################################################################
+### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
+
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 save.image("TRAL_IPM_output_v5.RData")
 
@@ -551,48 +556,4 @@ save.image("TRAL_IPM_output_v5.RData")
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-#########################################################################
-# ESTIMATING STABLE STAGE DISTRIBUTION WITH SIMPLE DETERMINISTIC MODEL ##
-#########################################################################
-
-#################### CREATING THE POPULATION MATRIX #####################
-## transition probabilities are FROM (col) TO (row)
-library(popbio)
-seabird.matrix<-expression(
-  0,0,0,0,0,0,0,0,0,0,(F*0.5*S2),
-  S1,0,0,0,0,0,0,0,0,0,0,
-  0,S1,0,0,0,0,0,0,0,0,0,
-  0,0,S1,0,0,0,0,0,0,0,0,
-  0,0,0,S1,0,0,0,0,0,0,0,
-  0,0,0,0,S1,0,0,0,0,0,0,
-  0,0,0,0,0,S2,0,0,0,0,0,
-  0,0,0,0,0,0,S2,0,0,0,0,
-  0,0,0,0,0,0,0,S2,0,0,0,
-  0,0,0,0,0,0,0,0,S2,0,0,
-  0,0,0,0,0,0,0,0,0,(S2*F+S2*(1-F)*0.3),S2*(1-F)*0.7
-)
-
-
-
-### CREATE LESLIE MATRIX WITH SUBSET OF VITAL RATES
-
-seabird.vr<-list(F=0.32, S1=0.80,S2=0.93)
-A<-matrix(sapply(seabird.matrix, eval,seabird.vr , NULL), nrow=sqrt(length(seabird.matrix)), byrow=TRUE)
-stable.stage(A)
-
-
-
-#### TROUBLESHOOT INCONSISTENT ERROR PROBLEM ####
-rmultinom(n=rep(100,5), size=runif(100,600,700), prob=jags.data$prop)
 

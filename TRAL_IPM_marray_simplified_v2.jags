@@ -35,9 +35,9 @@
     # -------------------------------------------------        
     # 1.2. Priors and constraints FOR POPULATION COUNTS
     # -------------------------------------------------
-    for (s in 1:n.sites){			### start loop over every study area
-      for (t in 1:T){			### start loop over every year
-        sigma.obs[s,t] ~ dunif(0,10)	#Prior for SD of observation process (variation in detectability)
+    for (s in 1:n.sites){### start loop over every study area
+      for (t in 1:T){### start loop over every year
+        sigma.obs[s,t] ~ dunif(0,10)#Prior for SD of observation process (variation in detectability)
         tau.obs[s,t]<-pow(sigma.obs[s,t],-2)
       }
     }
@@ -48,8 +48,8 @@
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    mean.p.juv ~ dunif(0.2, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
-    mean.p.ad ~ dunif(0.2, 1)	           # Prior for mean adult recapture - should be higher than 20%
+    mean.p.juv ~ dunif(0.2, 1)           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
+    mean.p.ad ~ dunif(0.2, 1)           # Prior for mean adult recapture - should be higher than 20%
     mu.p.juv <- log(mean.p.juv / (1-mean.p.juv)) # Logit transformation
     mu.p.ad <- log(mean.p.ad / (1-mean.p.ad)) # Logit transformation
 
@@ -124,13 +124,14 @@
     
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
+    ## ADJUSTED BASED ON PAST POPULATION SIZES
     Ntot.breed[1] ~ dunif(1500,2000) ###   ### sum of counts is 2400, but we take average over 3 years because 2001 was an outlier year
     JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
-    N1[1]<-round(JUV[1]*mean.phi.juv)
-    N2[1]<-round(N1[1]*mean.phi.juv)
-    N3[1]<-round(N2[1]*mean.phi.juv)
-    N4[1]<-round(N3[1]*mean.phi.juv)
-    N.notrecruited[1] <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
+    N1[1] ~ dunif(200,700)  ##<-round(JUV[1]*mean.phi.juv)
+    N2[1] ~ dunif(100,600)  ##<-round(N1[1]*mean.phi.juv)
+    N3[1] ~ dunif(300,800)  ## very large number of birds due to 2400 breeders in 2001 <-round(N2[1]*mean.phi.juv)
+    N4[1] ~ dunif(100,400)  ##<-round(N3[1]*mean.phi.juv)
+    N.notrecruited[1] ~ dunif(50,800)  ### all birds not recruited, including those from 1999 bumper year <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
     
     #N.prev.unsucc.atsea[1] ~ dunif(200,700)
     #N.prev.succ.atsea[1] ~ dunif(300,600)
@@ -140,28 +141,28 @@
     # 2.2. Observation process for population counts: state-space model of annual counts
     # -------------------------------------------------
     
-    for (s in 1:n.sites){			### start loop over every study area
+    for (s in 1:n.sites){### start loop over every study area
     
       ## Observation process
     
       for (t in 1:T){
-        y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s,t])								# Distribution for random error in observed numbers (counts)
-      }														# run this loop over t= nyears
-    }		## end site loop
+        y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s,t])# Distribution for random error in observed numbers (counts)
+      }# run this loop over t= nyears
+    }## end site loop
 
     
     # -------------------------------------------------        
     # 2.3. Likelihood for fecundity: Logistic regression from the number of surveyed broods
     # -------------------------------------------------
-    # for (s in 1:n.sites){			### start loop over every study area
+    # for (s in 1:n.sites){### start loop over every study area
     #   for (t in 1:(T-1)){
     #     J[t,s] ~ dpois(rho.fec[t,s])
     #     rho.fec[t,s] <- y.count[t,s]*ann.fec[t]
-    #   } #	close loop over every year in which we have fecundity data
-    # }		## end site loop
+    #   } #close loop over every year in which we have fecundity data
+    # }## end site loop
     for (t in 1:(T)){
       J[t] ~ dbin(ann.fec[t], R[t])
-    } #	close loop over every year in which we have fecundity data
+    } #close loop over every year in which we have fecundity data
     
     
     
@@ -212,7 +213,7 @@
     ## DERIVED POPULATION GROWTH RATE PER YEAR
     for (t in 1:(T-1)){
       lambda[t]<-Ntot.breed[t+1]/max(1,Ntot.breed[t])  ## division by 0 creates invalid parent value
-    }		## end year loop
+    }## end year loop
     
 
     ## DERIVED MEAN FECUNDITY 
