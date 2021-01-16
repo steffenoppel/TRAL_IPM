@@ -9,6 +9,8 @@
 # changed on 3 April 2020 to adjust for reduced parameters monitored
 # changed on 22 April to incorporate 3 scenarios
 
+# updated 15 January 2021 to include new output from m-array
+
 
 library(tidyverse)
 library(jagsUI)
@@ -24,13 +26,13 @@ select<-dplyr::select
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
-load("TRAL_IPM_output_v4.RData")
+load("TRAL_IPM_output_v5.RData")
 
 
 
 
 #########################################################################
-# PRODUCE OUTPUT TABLES THAT COMBINE ALL 4 SCENARIOS
+# PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
 #########################################################################
 
 
@@ -38,15 +40,19 @@ load("TRAL_IPM_output_v4.RData")
 export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
   setNames(c('Mean', 'Median','SD','lcl', 'ucl','Rhat')) %>%
   mutate(parameter=row.names(TRALipm$summary)) %>%
-  mutate(parameter=ifelse(grepl("ann.surv\\[1,",parameter,perl=T,ignore.case = T)==T,"juv.survival",parameter)) %>%
-  mutate(parameter=ifelse(grepl("ann.surv\\[2,",parameter,perl=T,ignore.case = T)==T,"adult.survival",parameter)) %>%
-  mutate(Year=c(seq(2001,2020,1),rep(seq(2021,2050,1),each=3),   ## for Ntot - with 3 scenarios
-                #seq(2001,2019,1),   ## for lambda
-                #seq(2020,2049,1),   ## fut.lambda
-                seq(2001,2020,1),   ## ann.fec
-                rep(seq(2000.5,2018.5,1),each=2), ##  juv and adult survival
-                rep(NA,10))) %>%
-  filter(!parameter=="juv.survival") %>%
+  #mutate(parameter=ifelse(grepl("ann.surv\\[1,",parameter,perl=T,ignore.case = T)==T,"juv.survival",parameter)) %>%
+  #mutate(parameter=ifelse(grepl("ann.surv\\[2,",parameter,perl=T,ignore.case = T)==T,"adult.survival",parameter)) %>%
+  # mutate(Year=c(seq(2004,2020,1),rep(seq(2021,2050,1),each=3),   ## for Ntot - with 3 scenarios
+  #               #seq(2001,2019,1),   ## for lambda
+  #               #seq(2020,2049,1),   ## fut.lambda
+  #               seq(2004,2020,1),   ## ann.fec
+  #               rep(seq(1979.5,2020.5,1),each=2), ##  juv and adult survival
+  #               rep(NA,10))) %>%
+  mutate(Year=c(seq(2004,2020,1),   ## for ann.fec
+                rep(NA,9),         ## for mean phi, p, and growth rates
+                seq(2004,2020,1),   ## for N.tot
+                rep(seq(2021,2050,1),each=3), ##  for Ntot.f with 3 scenarios
+                rep(NA,1))) %>%     ## for deviance
   arrange(parameter,Year)
 tail(export)
 hist(export$Rhat)
@@ -55,37 +61,19 @@ write.table(export,"TRAL_Gough_IPM_estimates_2020_v5.csv", sep=",", row.names=F)
 
 
 
-## write output into file ##
-# exportmouse<-as.data.frame(TRALmouse$summary) %>% select(c(1,5,2,3,7,8)) %>%
-#   setNames(c('Mean', 'Median','SD','lcl', 'ucl','Rhat')) %>%
-#   mutate(parameter=row.names(TRALipm$summary)) %>%
-#   mutate(parameter=ifelse(grepl("ann.surv\\[1,",parameter,perl=T,ignore.case = T)==T,"juv.survival",parameter)) %>%
-#   mutate(parameter=ifelse(grepl("ann.surv\\[2,",parameter,perl=T,ignore.case = T)==T,"adult.survival",parameter)) %>%
-#   mutate(Year=c(seq(2001,2049,1),   ## for Ntot
-#                 seq(2001,2018,1),   ## for lambda
-#                 seq(2019,2048,1),   ## fut.lambda
-#                 seq(2001,2019,1),   ## ann.fec
-#                 rep(seq(2000.5,2017.5,1),each=2), ##  juv and adult survival
-#                 rep(NA,8))) 
-# hist(exportmouse$Rhat)
-
-
 
 #########################################################################
 # PRODUCE TABLE 1 THAT SUMMARISES DEMOGRAPHIC RATES
 #########################################################################
 
 TABLE1<-export %>% mutate(parameter=ifelse(grepl("ann.fec",parameter,perl=T,ignore.case = T)==T,"fecundity",parameter))%>%
-    mutate(parameter=ifelse(grepl("imm.rec",parameter,perl=T,ignore.case = T)==T,"recruitment",parameter))%>%
-    mutate(parameter=ifelse(grepl("skip.",parameter,perl=T,ignore.case = T)==T,"breed.propensity",parameter))%>%
+    mutate(parameter=ifelse(grepl("mean.p.juv",parameter,perl=T,ignore.case = T)==T,"recruitment",parameter))%>%
+    mutate(parameter=ifelse(grepl("mean.p.ad",parameter,perl=T,ignore.case = T)==T,"breed.propensity",parameter))%>%
     mutate(parameter=ifelse(grepl("Ntot.breed",parameter,perl=T,ignore.case = T)==T,"pop.size",parameter)) %>%
-  mutate(parameter=ifelse(grepl("lambda",parameter,perl=T,ignore.case = T)==T,"population.growth.rate",parameter)) %>%
   group_by(parameter) %>%
   summarise(median=mean(Median),lcl=mean(lcl),ucl=mean(ucl)) %>%
   filter(!parameter=="deviance") %>%
-  filter(!parameter=="pop.size") %>%
-  filter(!parameter=="beta[2]") %>%
-  mutate(parameter=ifelse(parameter=="beta[1]","juvenile.survival",parameter))
+  filter(!parameter=="pop.size")
 
 write.table(TABLE1,"TRAL_demographic_estimates_2020.csv", sep=",", row.names=F)
 
@@ -136,7 +124,7 @@ export %>%
         panel.border = element_blank())
 
 #ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios.pdf", width=14, height=8)
-ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios_v5.jpg", width=14, height=8)
+ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_3scenarios_marray.jpg", width=14, height=8)
 
 
 
