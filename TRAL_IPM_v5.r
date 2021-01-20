@@ -35,9 +35,13 @@
 ## 10-12 Jan 2021: simplified initial values and adjusted priors - MODEL CONVERGED BUT has very high juvenile survival bounded by priors on p and phi
 
 ## 13 January 2021: re-inserted carrying capacity into future projections to prevent pop sizes >5000
-
 ## 15 January 2021: removed data from 2011 and included biennial breeding schedule into future projections
 
+## 20 January 2021: preliminary output suggests slower increase with than without eradication - examined code to identify problem
+
+## NEED TO DO: calculate lambda for total pop - not just breeding pop (include imm and at sea birds)
+## revise transition to future to avoid the massive spike in 2022 in scenarios 1 and 3 (due to succ breeders remaining at sea?)
+## calculate total pop at each time step and include in output
 
 library(tidyverse)
 library(lubridate)
@@ -123,8 +127,8 @@ TRAL.chick<-TRAL.chick %>% gather(key='Site', value='Count',-Year) %>%
   mutate(Count=ifelse(Count==0,NA,Count)) %>%
   spread(key=Site, value=Count)
 
-### NOTE THAT USE OF 'if_else' switches Gonydale and GP_Valley columns around
-TRAL.chick[8,5]<-CHICKCOUNT[11,4] ### in 2011 no adults were counted in Green hill and Hummocks, so we cannot add up the chicks across those 3 sites
+### NOTE THAT USE OF 'if_else' switches Gonydale and GP_Valley columns around [only happens in R4.0.2!!]
+TRAL.chick[8,4]<-CHICKCOUNT[11,4] ### in 2011 no adults were counted in Green hill and Hummocks, so we cannot add up the chicks across those 3 sites
 
 
 TRAL.chick$tot<-rowSums(TRAL.chick[,2:9], na.rm=T)
@@ -207,7 +211,7 @@ cat("
     # -------------------------------------------------
     for (s in 1:n.sites){			### start loop over every study area
       for (t in 1:T){			### start loop over every year
-        sigma.obs[s,t] ~ dunif(0,10)	#Prior for SD of observation process (variation in detectability)
+        sigma.obs[s,t] ~ dunif(0,20)	#Prior for SD of observation process (variation in detectability)
         tau.obs[s,t]<-pow(sigma.obs[s,t],-2)
       }
     }
@@ -430,7 +434,7 @@ for(scen in 1:n.scenarios){
     # -------------------------------------------------
 
     ## INCLUDE CARRYING CAPACITY OF 2500 breeding pairs (slightly more than maximum ever counted)
-    carr.capacity[scen,tt] ~ dnorm(2500,10)
+    carr.capacity[scen,tt] ~ dnorm(2500,0.05)
     
     ## THE PRE-BREEDING YEARS ##
     ## because it goes for 30 years, all pops must be safeguarded to not become 0 because that leads to invald parent error
@@ -514,7 +518,8 @@ jags.data <- list(marr.j = chick.marray,
 # Initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 1),
                          mean.phi.juv = runif(1, 0.5, 0.9),
-                         mean.p = runif(1, 0, 1),
+                         mean.p.ad = runif(1, 0.2, 1),
+                         mean.p.juv = runif(1, 0.2, 1),
                          Ntot.breed= c(runif(1, 1500, 2000),rep(NA,n.years-1)),
                          #bycatch = rnorm(1,0,0.01),
                          #hookpod = rnorm(1,0,0.01),
@@ -523,17 +528,17 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 1),
                          #sigma.proc=runif(n.sites,0,10),
                          #mean.lambda=runif(n.sites,0.1,2),
                          #N.est=N.init,  ## results in 'inconsistent with parents' error
-                         sigma.obs=matrix(runif(n.sites*n.years,1,10),ncol=n.years))}
+                         sigma.obs=matrix(runif(n.sites*n.years,1,20),ncol=n.years))}
 
  
 
 # Parameters monitored
-parameters <- c("ann.fec","mean.phi.ad","mean.phi.juv","mean.fec","mean.skip","mean.p.ad","mean.p.juv","pop.growth.rate","fut.growth.rate","Ntot.breed","Ntot.breed.f")  
+parameters <- c("ann.fec","mean.phi.ad","mean.phi.juv","mean.fec","mean.skip","mean.p.ad","mean.p.juv","pop.growth.rate","fut.growth.rate","Ntot.breed","Ntot.breed.f","lambda","p.ad")  
 
 # MCMC settings
-ni <- 25000
+ni <- 250000
 nt <- 4
-nb <- 5000
+nb <- 50000
 nc <- 3
 
 

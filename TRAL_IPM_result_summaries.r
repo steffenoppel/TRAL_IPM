@@ -52,6 +52,8 @@ export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
                 rep(NA,9),         ## for mean phi, p, and growth rates
                 seq(2004,2020,1),   ## for N.tot
                 rep(seq(2021,2050,1),each=3), ##  for Ntot.f with 3 scenarios
+                seq(2004,2020,1), ##  for lambda 
+                seq(1979,2020,1), ##  for p.ad 
                 rep(NA,1))) %>%     ## for deviance
   arrange(parameter,Year)
 tail(export)

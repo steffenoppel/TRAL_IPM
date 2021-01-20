@@ -38,7 +38,7 @@
     # -------------------------------------------------
     for (s in 1:n.sites){			### start loop over every study area
       for (t in 1:T){			### start loop over every year
-        sigma.obs[s,t] ~ dunif(0,10)	#Prior for SD of observation process (variation in detectability)
+        sigma.obs[s,t] ~ dunif(0,20)	#Prior for SD of observation process (variation in detectability)
         tau.obs[s,t]<-pow(sigma.obs[s,t],-2)
       }
     }
@@ -261,7 +261,7 @@ for(scen in 1:n.scenarios){
     # -------------------------------------------------
 
     ## INCLUDE CARRYING CAPACITY OF 2500 breeding pairs (slightly more than maximum ever counted)
-    carr.capacity[scen,tt] ~ dnorm(2500,10)
+    carr.capacity[scen,tt] ~ dnorm(2500,0.05)
     
     ## THE PRE-BREEDING YEARS ##
     ## because it goes for 30 years, all pops must be safeguarded to not become 0 because that leads to invald parent error
