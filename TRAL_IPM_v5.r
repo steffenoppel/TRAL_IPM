@@ -559,7 +559,7 @@ TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\A
 ### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_v5.RData")
+save.image("TRAL_IPM_output_v5_Ntot.RData")
 
 
 
