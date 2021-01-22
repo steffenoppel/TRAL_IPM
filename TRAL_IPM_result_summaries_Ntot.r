@@ -53,10 +53,15 @@ export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
                 rep(NA,9),         ## for mean phi, p, and growth rates
                 seq(2004,2020,1),   ## for N.tot
                 rep(seq(2021,2050,1),each=3), ##  for Ntot.f with 3 scenarios
-                seq(2004,2020,1), ##  for lambda 
-                seq(1979,2020,1), ##  for p.ad 
+                seq(2004,2019,1), ##  for lambda 
+                seq(1978,2020,1), ##  for p.ad 
                 rep(NA,1))) %>%     ## for deviance
-  arrange(parameter,Year)
+  mutate(demographic=parameter) %>%
+  mutate(demographic=ifelse(grepl("ann.fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
+  mutate(demographic=ifelse(grepl("p.ad",parameter,perl=T,ignore.case = T)==T,"breed.propensity",demographic))%>%
+  mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
+  mutate(demographic=ifelse(grepl("lambda",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
+  arrange(demographic,Year)
 tail(export)
 hist(export$Rhat)
 
@@ -72,15 +77,28 @@ write.table(export,"TRAL_Gough_IPM_estimates_2020_v5.csv", sep=",", row.names=F)
 TABLE1<-export %>% mutate(parameter=ifelse(grepl("ann.fec",parameter,perl=T,ignore.case = T)==T,"fecundity",parameter))%>%
     mutate(parameter=ifelse(grepl("mean.p.juv",parameter,perl=T,ignore.case = T)==T,"recruitment",parameter))%>%
     mutate(parameter=ifelse(grepl("mean.p.ad",parameter,perl=T,ignore.case = T)==T,"breed.propensity",parameter))%>%
-    mutate(parameter=ifelse(grepl("Ntot.breed",parameter,perl=T,ignore.case = T)==T,"pop.size",parameter)) %>%
+    mutate(parameter=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",parameter)) %>%
   group_by(parameter) %>%
   summarise(median=mean(Median),lcl=mean(lcl),ucl=mean(ucl)) %>%
   filter(!parameter=="deviance") %>%
-  filter(!parameter=="pop.size")
+  filter(!parameter=="pop.size") %>%
+  filter(!parameter=="mean.fec") %>%
+  filter(!grepl("lambda",parameter,perl=T,ignore.case = T)==T)
 
 write.table(TABLE1,"TRAL_demographic_estimates_2020.csv", sep=",", row.names=F)
 
 
+
+
+#########################################################################
+# PLOT ADULT RETURN AND RESIGHT PROBABILITY
+#########################################################################
+
+export %>% filter(grepl("p.ad",parameter,perl=T,ignore.case = T)==T) %>%
+  filter(!parameter=="mean.p.ad") %>%
+  arrange(Year) %>%
+  
+  ggplot(aes(x=Year,y=Median)) + geom_point(size=2) + geom_smooth(method='lm')  + theme_bw()
 
 
 

@@ -44,6 +44,9 @@
 ## revise transition to future to avoid the massive spike in 2022 in scenarios 1 and 3 (due to succ breeders remaining at sea?)
 ## calculate total pop at each time step and include in output
 
+## 22 JANUARY 2021: MAJOR ISSUE IN MEAN.P.AD - mean is higher than any annual value!
+
+
 library(tidyverse)
 library(lubridate)
 library(data.table)
