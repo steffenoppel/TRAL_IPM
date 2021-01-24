@@ -8,6 +8,8 @@
 ## updated on 31 March 2020
 
 ## completely revised on 5 Jan 2021 to incorporate m-array survival estimation in IPM
+## 23 January 2021: fixed one data error (chick ringed in 1977) and set p.juv to 0 for first year after marking -> results in more sensible estimates
+
 
 library(tidyverse)
 library(lubridate)
@@ -233,9 +235,9 @@ contacts %>% filter(is.na(ContAge))
 
 
 
-#############################################################################
-##   7. REMOVE BIRDS FROM OUTSIDE THE STUDY AREAS ###############
-#############################################################################
+################################################################################################
+##   7. REMOVE BIRDS FROM OUTSIDE THE STUDY AREAS AND SUMMARISE DETECTION RATES ###############
+##############################################################################################
 
 ########## CREATE A LOOP OVER EVERY BIRD TO CHECK WHETHER THEY WERE EVER RECORDED IN STUDY AREAS
 STUDY_AREAS<- c("Hummocks","Gonydale","Tafelkop")
@@ -253,12 +255,49 @@ dim(fixed_contacts)
 length(unique(fixed_contacts$BirdID))
 length(allbirds)
 
+
+### CHECK WHAT BIRDS WERE RINGED AS CHICKS BEFORE 1978
+oldchicks<-fixed_contacts %>% filter(Contact_Year<=start) %>% filter(ContAge<2)
+fixed_contacts %>% filter(BirdID %in% oldchicks$BirdID)
+## manually set Contact_Year to 1978 for two chicks ringed in 1977 to avoid creating an encounter occasion for 2 birds
+fixed_contacts$Contact_Year[fixed_contacts$ContactID=="GO-TRAL-187"]<-1979
+fixed_contacts$Contact_Year[fixed_contacts$ContactID=="GO-TRAL-188"]<-1979
+fixed_contacts$FIRST_YEAR[fixed_contacts$ContactID=="GO-TRAL-187"]<-1979
+fixed_contacts$FIRST_YEAR[fixed_contacts$ContactID=="GO-TRAL-188"]<-1979
+year(fixed_contacts$Date_Time[fixed_contacts$ContactID=="GO-TRAL-187"])<-1979
+year(fixed_contacts$Date_Time[fixed_contacts$ContactID=="GO-TRAL-188"])<-1979
+
 ### REMOVE RECORDS FROM BEFORE THE SET START YEAR AND BIRDS FIRST MARKED IN LAST YEAR
 contacts<-fixed_contacts %>%
   filter(year(Date_Time)>start) %>%
   filter(ContAge!=1)    ## remove 5 records of unfledged chicks within a few weeks/months of ringing
 dim(contacts)
 unique(contacts$FIRST_AGE)
+
+
+## try to determine years with high and low detection probability
+
+contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
+  ggplot() + geom_bar(aes(x=Contact_Year,y=n), stat="identity")
+
+## calculate number of individuals that had been marked by a given year
+n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
+  group_by(Contact_Year) %>%
+  summarise(N_marked=sum(count)) %>%
+  arrange(Contact_Year) %>%
+  mutate(N_all = cumsum(N_marked)) %>%
+  bind_rows(tibble(Contact_Year=2021,N_marked=0,N_all=0)) %>%
+  mutate(N_all=if_else(Contact_Year==2021,dplyr::lag(N_all),N_all))
+tail(n_exist)
+
+goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
+  left_join(n_exist, by='Contact_Year') %>%
+  mutate(prop.seen=n/N_all) %>%
+  mutate(p.sel=if_else(prop.seen>0.1,2,1))
+tail(goodyears)
+
+ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.03)
+ggplot(goodyears) + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=p.sel), stat="identity")
 
 
 
@@ -363,6 +402,8 @@ adult.marray <- marray(CH.A.m)
 
 # Create m-array for the chicks that were ultimately recaptured, but only up to the first recapture (the rest is included in the adult.marray)
 CH.J.R.marray <- marray(CH.J.R2)
+diag(CH.J.R.marray)  ## this should not contain any 1s because that would mean a chick is caught in the year after it was marked
+
 # The last column ought to show the number of juveniles not recaptured again and should all be zeros, since all of them are released as adults
 CH.J.R.marray[,dim(CH.J)[2]] <- 0
 
