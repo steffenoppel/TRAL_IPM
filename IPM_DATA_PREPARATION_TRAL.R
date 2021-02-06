@@ -133,6 +133,9 @@ POPSIZE<-counts %>% filter(Species==SP) %>%
   spread(key=Colony, value=N)
 POPSIZE
 
+### PLOT TO SPOT ANY OUTLIERS OF COUNT DATA
+POPSIZE %>% gather(key="Colony",value="N",-Year) %>% group_by(Year) %>% summarise(TOT=sum(N, na.rm=T)) %>%
+ggplot(aes(x=Year,y=TOT)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') 
 
 
 ### summary of population counts of fledglings per year and colony
