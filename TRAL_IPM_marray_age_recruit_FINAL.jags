@@ -1,185 +1,4 @@
-##########################################################################
-#
-# TRISTAN ALBATROSS INTEGRATED POPULATION MODEL 2001-2050
-#
-##########################################################################
-# based on Kery and Schaub 2012, Chapter 11
-# modified by Steffen oppel, JULY 2019
-# based on AYNA IPM code
-# major changes to AYNA: more gappy count data series
-# adult encounter occasions span almost entire year
-# breeding success is area specific
 
-# v2 initiated on 17 July 2019 after advice from Adam Butler to include multinomial probability for N.est
-# dmulti did not work with 'cannot find sampler' error, so changed to obs model instead
-# v3 initiated on 17 July 2019 after advice from Chris Jones that we cannot exclude sites - lumped all data together and used a single input vector for count data, thus reducing the problem of dmulti to include multinomial probability for N.est
-# seems to work but when niter>500 error occurs 'slicer stuck at infinite density'
-# updated 22 July 2019: inserted truncations T(0.001,0.999) to prevent slice sampler getting stuck at infinite density
-## UPDATED on 24 July 2019 to include future projection
-## UPDATED ON 6 August 2019 to revise SSM part of the model after nonconvergence of basic SSM
-## UPDATED ON 2 April 2020 to fix juvenile survival to constant and fix first pop count data to a lower number (based on Peter Ryan's suggestion via email)
-## UPDATED ON 21 April 2020 to include future scenarios - mouse eradication (fec increases) or mouse predation (surv decreases)
-## TRAL_IPM_fut_v3.jags runs ok and produces sensible output
-## TRAL_IPM_fut_v4.jags intended to include 3 future scenarios
-## UPDATED ON 20 May 2020 to include carrying capacity to prevent overshoot to 10,000 pairs
-## TRAL_IPM_fut_v5.jags includes carrying capacity at 2500 birds
-
-## v5 completely revised in January 2021 to update survival estimation
-## abandoned individual survival via SSM and instead use m-array approach with two age groups
-## REMOVED 2001 data and start process in 2004!
-
-## 9 Jan 2021: tried to relate pop change (skip.prob) to proportion of nests failing at egg vs chick stage (or day of failure)
-## none of the breed.fail metrics explains pop change from one year to the next - need to keep this totally random
-
-## 9 JANUARY 2021: major revision to population process trying to simplify the quantities that explain which birds return to island
-## 10-12 Jan 2021: simplified initial values and adjusted priors - MODEL CONVERGED BUT has very high juvenile survival bounded by priors on p and phi
-
-## 13 January 2021: re-inserted carrying capacity into future projections to prevent pop sizes >5000
-## 15 January 2021: removed data from 2011 and included biennial breeding schedule into future projections
-
-## 20 January 2021: preliminary output suggests slower increase with than without eradication - examined code to identify problem
-## 21 January 2021: added Ntot into model and as output
-
-## NEED TO DO: calculate lambda for total pop - not just breeding pop (include imm and at sea birds)
-## revise transition to future to avoid the massive spike in 2022 in scenarios 1 and 3 (due to succ breeders remaining at sea?)
-## calculate total pop at each time step and include in output
-
-## 24 JANUARY 2021: MAJOR revision to data preparation and survival part of the model - included two p-intercepts and set p.juv to 0 for first year
-## 25 January 2021: improved calculation of mean.p.ad to be used in future projection
-
-## FINAL IS BASED ON V5 but includes data from 2021 and eliminates all unnecessary code
-## updated 7 Feb 2021 to include age-dependent recapture probability
-
-
-library(tidyverse)
-library(lubridate)
-library(data.table)
-library(jagsUI)
-filter<-dplyr::filter
-select<-dplyr::select
-
-
-
-#########################################################################
-# LOAD PRE-PREPARED DATA ON COUNTS AND BREEDING SUCCESS
-#########################################################################
-### see 'IPM_DATA_PREPARATION.R' for details on how data are aggregated
-
-### NOTE THAT SORT ORDER OF GONYDALE AND GP VALLEY HAS SHIFTED ON 15 Jan 2021 (due to switch to if_else on R4.0.2)
-
-## LOAD PREPARED M-ARRAY FOR SURVIVAL ESTIMATION
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-load("TRAL_IPM_input.marray.RData")
-
-## BOTH ARRAYS MUST HAVE EXACT SAME DIMENSIONS
-dim(chick.marray)
-dim(adult.marray)
-
-
-### COUNT DATA FOR POPULATION TREND ######
-TRAL.pop<-POPSIZE ##fread("TRAL_INCU_counts_2001_2020.csv")
-head(TRAL.pop)
-names(TRAL.pop)
-TRAL.pop[14,4]<-136   ### number of nests monitored in Gonydale that year
-
-## COMBINE SITES THAT WERE AMBIGUOUSLY DEFINED OVER TIME 
-TRAL.pop<-TRAL.pop %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2003) %>%
-  mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
-  mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
-  group_by(Year,Site) %>%
-  summarise(Count=sum(Count, na.rm=T)) %>%
-  mutate(Count=ifelse(Count==0,NA,Count)) %>%
-  spread(key=Site, value=Count)
-
-## to account for data gaps, need to quantify what proportion of the population was counted
-
-TRAL.props<-prop.table(as.matrix(TRAL.pop[,2:9]),1)
-#mean.props<-apply(TRAL.props[c(1,4,6:10,12:16,18:19),],2,mean) ## for start in 2001
-mean.props<-apply(TRAL.props[c(1,3:7,9:13,15:17),],2,mean) ## for start in 2004
-
-TRAL.pop$prop.counted<-0
-for (l in 1:length(TRAL.pop$Year)){
-  TRAL.pop$prop.counted[l]<-sum(mean.props[which(!is.na(TRAL.pop[l,2:9]))])
-}
-
-
-## CALCULATE SUM PER YEAR 
-TRAL.pop$tot<-rowSums(TRAL.pop[,2:9], na.rm=T)
-#TRAL.pop$tot[c(2,3,11)]<-NA
-R<- as.matrix(TRAL.pop[,2:9])
-n.years<-nrow(R)
-n.sites<-ncol(R)
-
-
-
-### PLOT TO SPOT ANY OUTLIERS OF BCOUNTS
-ggplot(TRAL.pop, aes(x=Year,y=tot)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') 
-
-
-
-
-#### BREEDING SUCCESS DATA FOR FECUNDITY ######
-TRAL.chick<-CHICKCOUNT  ##fread("TRAL_CHIC_counts_2001_2020.csv")
-## detailed nest data from Gonydale only available for some years - we use this to replace missing count data
-TRAL.bs<-FECUND ##fread("TRAL_breed_success_2006_2019.csv")
-TRAL.chick[TRAL.chick$Year==2013,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2013,4]*TRAL.bs$BREED_SUCC[TRAL.bs$Year==2013])
-TRAL.chick[TRAL.chick$Year==2014,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2014,4]*TRAL.bs$BREED_SUCC[TRAL.bs$Year==2014])
-
-TRAL.chick<-TRAL.chick %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2003) %>%
-  mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
-  mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
-  group_by(Year,Site) %>%
-  summarise(Count=sum(Count, na.rm=T)) %>%
-  mutate(Count=ifelse(Count==0,NA,Count)) %>%
-  spread(key=Site, value=Count)
-
-### NOTE THAT USE OF 'if_else' switches Gonydale and GP_Valley columns around [only happens in R4.0.2!!]
-TRAL.chick[8,4]<-CHICKCOUNT[11,4] ### in 2011 no adults were counted in Green hill and Hummocks, so we cannot add up the chicks across those 3 sites
-
-
-TRAL.chick$tot<-rowSums(TRAL.chick[,2:9], na.rm=T)
-#TRAL.chick$tot[c(3,13,19)]<-NA   ## when start in 2001
-TRAL.chick$tot[10]<-NA   ## when start in 2004
-
-J<- as.matrix(TRAL.chick[,2:9])
-
-### specify constants for JAGS
-n.years<-dim(R)[1]		## defines the number of years
-n.sites<-dim(R)[2]    ## defines the number of study areas
-
-
-### UPDATE 10 January 2021 - reduce R and J to vectors of sum across the study areas for which we have data
-
-Jlong<-TRAL.chick %>% gather(key='Site', value="chicks",-Year)
-PROD.DAT<-TRAL.pop %>% select(-prop.counted,-tot) %>% gather(key='Site', value="adults",-Year) %>%
-  left_join(Jlong, by=c("Year","Site")) %>%
-  mutate(include=ifelse(is.na(adults+chicks),0,1)) %>%
-  filter(include==1) %>%
-  group_by(Year) %>%
-  summarise(J=sum(chicks),R=sum(adults))
-
-
-
-
-
-### DIMENSION MISMATCH IN DATA
-# IPM runs from 2001-2020
-# survival analysis runs from 1979-2021
-names(TRAL_CHICK)
-TRAL.pop$Year
-
-OFFSET<-min(which(!is.na(match(as.numeric(names(TRAL_CHICK)[2:44]),TRAL.pop$Year))))
-names(TRAL_CHICK)[OFFSET+1]
-TRAL.pop$Year[1]
-
-#########################################################################
-# SPECIFY MODEL IN JAGS
-#########################################################################
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-sink("TRAL_IPM_marray_age_recruit_FINAL.jags")
-cat("
 
   
     model {
@@ -288,7 +107,7 @@ cat("
     for (tt in 2:T){
     
       ## THE PRE-BREEDING YEARS ##
-    
+      logit(p.juv.recruit[tt])<-(mu.p.juv[goodyear[tt+25]] + eps.p[tt+25] + agebeta*(5))
       nestlings[tt] <- ann.fec[tt] * 0.5 * Ntot.breed[tt]                                                     ### number of locally produced FEMALE chicks
       JUV[tt] ~ dpois(nestlings[tt])                                                                     ### need a discrete number otherwise dbin will fail, dpois must be >0
       N1[tt]  ~ dbin(mean.phi.juv, round(JUV[tt-1]))                                                    ### number of 1-year old survivors 
@@ -296,7 +115,7 @@ cat("
       N3[tt] ~ dbin(phi.ad[tt+25], round(N2[tt-1]))                                                       ### number of 3-year old survivors
       N4[tt] ~ dbin(phi.ad[tt+25], round(N3[tt-1]))                                                       ### number of 4-year old survivors
       N.notrecruited.surv[tt] ~ dbin(phi.ad[tt+25], round(N.notrecruited[tt-1]))                        ### number of older immature survivors that have not recruited 
-      N.recruits[tt] ~ dbin(p.juv[tt+26,tt+31], round(N.notrecruited.surv[tt]+N4[tt]))                             ### number of this years recruiters
+      N.recruits[tt] ~ dbin(p.juv.recruit[tt], round(N.notrecruited.surv[tt]+N4[tt]))                             ### number of this years recruiters
       N.notrecruited[tt] <-round(N.notrecruited.surv[tt]+N4[tt]-N.recruits[tt])                         ### number of birds not yet recruited at the end of this year
  
       ## THE BREEDING POPULATION ##
@@ -304,7 +123,7 @@ cat("
       # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
 
       N.ad.surv[tt] ~ dbin(phi.ad[tt+25], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
-      N.breed.ready[tt] ~ dbin(p.ad[tt+26], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
+      N.breed.ready[tt] ~ dbin(p.ad[tt+25], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
       Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
       N.atsea[tt] <- round(N.ad.surv[tt]-N.breed.ready[tt])                     ### potential breeders that remain at sea    
       
@@ -494,98 +313,4 @@ for(scen in 1:n.scenarios){
 } # end future projection scenarios
     
 }  ## end model loop
-",fill = TRUE)
-sink()
-
-
-
-
-
-#########################################################################
-# PREPARE DATA FOR MODEL
-#########################################################################
-
-# Bundle data
-jags.data <- list(marr.j = chick.marray,
-                  marr.a = adult.marray,
-                  n.occasions = dim(chick.marray)[2],
-                  r.j=apply(chick.marray,1,sum),
-                  r.a=apply(adult.marray,1,sum),
-                  goodyear=goodyears$p.sel,
-                  
-                  ### count data
-                  n.sites=n.sites,
-                  T = n.years,
-                  prop.sites=mean.props,
-                  y.count=R,
-                  
-                  ### breeding success data
-                  J=PROD.DAT$J,
-                  R=PROD.DAT$R,
-                  
-                  ### longline effort data
-                  #longline=longlineICCAT,
-                  
-                  # ### FUTURE PROJECTION
-                  FUT.YEAR=30,  ### for different scenarios future starts at 1
-                  n.scenarios=3,
-                  fut.surv.change=c(1,1,0.9),     ## future survival rate change - vector with one element for each scenario
-                  fut.fec.change=c(1,2,1)     ## future fecundity change - vector with one element for each scenario
-                  )
-
-
-# Initial values 
-inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
-                         mean.phi.juv = runif(1, 0.5, 0.9),
-                         mean.p.ad = runif(2, 0.2, 1),
-                         mean.p.juv = runif(2, 0, 1),
-                         Ntot.breed= c(runif(1, 1500, 2000),rep(NA,n.years-1)),
-                         #bycatch = rnorm(1,0,0.01),
-                         #hookpod = rnorm(1,0,0.01),
-                         
-                         ### count data
-                         #sigma.proc=runif(n.sites,0,10),
-                         #mean.lambda=runif(n.sites,0.1,2),
-                         #N.est=N.init,  ## results in 'inconsistent with parents' error
-                         sigma.obs=matrix(runif(n.sites*n.years,1,20),ncol=n.years))}
-
- 
-
-# Parameters monitored
-parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv")  
-
-# MCMC settings
-ni <- 350
-nt <- 4
-nb <- 150
-nc <- 3
-
-
-
-# RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
-TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_FINAL.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
-                    #Rhat.limit=1.5, max.iter=150000)  
-
-
-
-
-
-#########################################################################
-# SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
-#########################################################################
-### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
-
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_v5_Ntot.RData")
-
-
-
-
-
-
-
-
-
-
 
