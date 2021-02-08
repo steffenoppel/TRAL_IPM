@@ -121,12 +121,12 @@
       N2[tt] ~ dbin(phi.ad[tt+24], round(N1[tt-1]))                                                      ### number of 2-year old survivors
       N2recruit[tt] ~ dbin(p.juv.recruit2[tt], round(N2[tt]))                                             ### number of 2-year old birds that return to Gough
       N3[tt] ~ dbin(phi.ad[tt+24], round(N2[tt-1]-N2recruit[tt-1]))                                                       ### number of 3-year old survivors
-      N3recruit[tt] ~ dbin(p.juv.recruit3[tt], round(N3[tt]))                                             ### number of 2-year old birds that return to Gough
+      N3recruit[tt] ~ dbin(p.juv.recruit3[tt], round(N3[tt]))                                             ### number of 3-year old birds that return to Gough
       N4[tt] ~ dbin(phi.ad[tt+24], round(N3[tt-1]-N3recruit[tt-1]))                                                       ### number of 4-year old survivors
-      N4recruit[tt] ~ dbin(p.juv.recruit4[tt], round(N4[tt]))                                             ### number of 2-year old birds that return to Gough
+      N4recruit[tt] ~ dbin(p.juv.recruit4[tt], round(N4[tt]))                                             ### number of 4-year old birds that return to Gough
       N5[tt] ~ dbin(phi.ad[tt+24], round(N4[tt-1]-N4recruit[tt-1]))                                                       ### number of 4-year old survivors
-      N5recruit[tt] ~ dbin(p.juv.recruit5[tt], round(N5[tt]))                                             ### number of 2-year old birds that return to Gough
-      Noldrecruit[tt] ~ dbin(p.juv.recruit6[tt], round(N.notrecruited.surv[tt]))                                             ### number of 2-year old birds that return to Gough
+      N5recruit[tt] ~ dbin(p.juv.recruit5[tt], round(N5[tt]))                                             ### number of 5-year old birds that return to Gough
+      Noldrecruit[tt] ~ dbin(p.juv.recruit6[tt], round(N.notrecruited.surv[tt]))                                             ### number of older immature birds that return to Gough
       N.recruits[tt] <- N2recruit[tt] + N3recruit[tt] + N4recruit[tt] + N5recruit[tt] + Noldrecruit[tt]  ### number of this years recruiters
       N.notrecruited.surv[tt] ~ dbin(phi.ad[tt+24], round(N.notrecruited[tt-1]))                        ### number of older immature survivors that have not recruited 
       N.notrecruited[tt] <-round((N.notrecruited.surv[tt]-Noldrecruit[tt])+(N5[tt]-N5recruit[tt]))                         ### number of birds not yet recruited at the end of this year
@@ -261,20 +261,32 @@
     ## scenario 2: successful mouse eradication in 2021 - fecundity doubles
     ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
+    ## define recruit probability for various ages ##
+    logit(p.juv.recruit2.f)<-mu.p.juv[2] + (agebeta * 2)
+    logit(p.juv.recruit3.f)<-mu.p.juv[2] + (agebeta * 3)
+    logit(p.juv.recruit4.f)<-mu.p.juv[2] + (agebeta * 4)
+    logit(p.juv.recruit5.f)<-mu.p.juv[2] + (agebeta * 5)
+    logit(p.juv.recruit6.f)<-mu.p.juv[2] + (agebeta * 30)
+
 
 for(scen in 1:n.scenarios){
-
 
     ### COPY POPULATIONS FROM LAST YEAR OF DATA SERIES
 
     nestlings.f[scen,1] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed[T])                                             ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
     N1.f[scen,1]  ~ dbin(mean.phi.juv, max(1,round(nestlings[T])))                                                    ### number of 1-year old survivors 
     N2.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N1[T])))                                                      ### number of 2-year old survivors
-    N3.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N2[T])))                                                       ### number of 3-year old survivors
-    N4.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N3[T])))                                                       ### number of 4-year old survivors
+    N2recruit.f[scen,1] ~ dbin(p.juv.recruit2.f, round(N2.f[scen,1]))                                             ### number of 2-year old birds that return to Gough
+    N3.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N2[T]-N2recruit[T])))                                                       ### number of 3-year old survivors
+    N3recruit.f[scen,1] ~ dbin(p.juv.recruit3.f, round(N3.f[scen,1]))                                             ### number of 3-year old birds that return to Gough
+    N4.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N3[T]-N3recruit[T])))                                                       ### number of 4-year old survivors
+    N4recruit.f[scen,1] ~ dbin(p.juv.recruit4.f, round(N4.f[scen,1]))                                             ### number of 4-year old birds that return to Gough
+    N5.f[scen,1] ~ dbin(mean.phi.ad, round(N4[T]-N4recruit[T]))                                                       ### number of 5-year old survivors
+    N5recruit.f[scen,1] ~ dbin(p.juv.recruit5.f, round(N5.f[scen,1]))                                             ### number of 5-year old birds that return to Gough
+    Noldrecruit.f[scen,1] ~ dbin(p.juv.recruit6.f, round(N.notrecruited.surv.f[scen,1]))                                             ### number of older immature birds that return to Gough
+    N.recruits.f[scen,1] <- N2recruit.f[scen,1] + N3recruit.f[scen,1] + N4recruit.f[scen,1] + N5recruit.f[scen,1] + Noldrecruit.f[scen,1]  ### number of this years recruiters
+    N.notrecruited.f[scen,1] <-round((N.notrecruited.surv.f[scen,1]-Noldrecruit.f[scen,1])+(N5.f[scen,1]-N5recruit.f[scen,1]))                         ### number of birds not yet recruited at the end of this year
     N.notrecruited.surv.f[scen,1] ~ dbin(mean.phi.ad, round(N.notrecruited[T]))                        ### number of older immature survivors that have not recruited 
-    N.recruits.f[scen,1] ~ dbin(mean.recruit, round(N.notrecruited.surv.f[scen,1]+N4.f[scen,1]))                             ### number of this years recruiters
-    N.notrecruited.f[scen,1] <-round(N.notrecruited.surv.f[scen,1]+N4.f[scen,1]-N.recruits.f[scen,1])                         ### number of birds not yet recruited at the end of this year
 
     N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))           ### previous year's adults that survive
     N.breed.ready.f[scen,1] ~ dbin(mean.p.ad[2], round(N.ad.surv.f[scen,1]))                  ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
@@ -302,11 +314,18 @@ for(scen in 1:n.scenarios){
     nestlings.f[scen,tt] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed.f[scen,tt])                       ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
     N1.f[scen,tt]  ~ dbin(mean.phi.juv, max(1,round(nestlings.f[scen,tt-1])))                                              ### number of 1-year old survivors 
     N2.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N1.f[scen,tt-1])))                                                      ### number of 2-year old survivors
-    N3.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N2.f[scen,tt-1])))                                                       ### number of 3-year old survivors
-    N4.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N3.f[scen,tt-1])))                                                       ### number of 4-year old survivors
-    N.notrecruited.surv.f[scen,tt] ~ dbin(fut.surv.change[scen]*mean.phi.ad, round(N.notrecruited.f[scen,tt-1]))                        ### number of older immature survivors that have not recruited 
-    N.recruits.f[scen,tt] ~ dbin(mean.p.ad[2], round(N.notrecruited.surv.f[scen,tt]+N4.f[scen,tt]))                             ### number of this years recruiters
-    N.notrecruited.f[scen,tt] <-round(N.notrecruited.surv.f[scen,tt]+N4.f[scen,tt]-N.recruits.f[scen,tt])                         ### number of birds not yet recruited at the end of this year
+    N2recruit.f[scen,tt] ~ dbin(p.juv.recruit2.f, round(N2.f[scen,tt]))                                             ### number of 2-year old birds that return to Gough
+    N3.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N2.f[scen,tt-1]-N2recruit.f[scen,tt-1])))                                                       ### number of 3-year old survivors
+    N3recruit.f[scen,tt] ~ dbin(p.juv.recruit3.f, round(N3.f[scen,tt]))                                             ### number of 3-year old birds that return to Gough
+    N4.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N3.f[scen,tt-1]-N3recruit.f[scen,tt-1])))                                                       ### number of 4-year old survivors
+    N4recruit.f[scen,tt] ~ dbin(p.juv.recruit4.f, round(N4.f[scen,tt]))                                             ### number of 4-year old birds that return to Gough
+    N5.f[scen,tt] ~ dbin(mean.phi.ad, round(N4.f[scen,tt-1]-N4recruit.f[scen,tt-1]))                                            ### number of 5-year old survivors
+    N5recruit.f[scen,tt] ~ dbin(p.juv.recruit5.f, round(N5.f[scen,tt]))                                             ### number of 5-year old birds that return to Gough
+    Noldrecruit.f[scen,tt] ~ dbin(p.juv.recruit6.f, round(N.notrecruited.surv.f[scen,tt]))                                             ### number of older immature birds that return to Gough
+    N.recruits.f[scen,tt] <- N2recruit.f[scen,tt] + N3recruit.f[scen,tt] + N4recruit.f[scen,tt] + N5recruit.f[scen,tt] + Noldrecruit.f[scen,tt]  ### number of this years recruiters
+    N.notrecruited.f[scen,tt] <-round((N.notrecruited.surv.f[scen,tt]-Noldrecruit.f[scen,tt])+(N5.f[scen,tt]-N5recruit.f[scen,tt]))                         ### number of birds not yet recruited at the end of this year
+    N.notrecruited.surv.f[scen,tt] ~ dbin(mean.phi.ad, round(N.notrecruited.f[scen,tt-1]))                        ### number of older immature survivors that have not recruited 
+
 
     ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
