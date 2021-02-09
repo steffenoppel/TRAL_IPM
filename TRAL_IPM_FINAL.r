@@ -183,8 +183,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 sink("TRAL_IPM_marray_age_recruit_immat.jags")
 cat("
 
-  
-    model {
+model {
     #-------------------------------------------------
     # integrated population model for the Gough TRAL population
     # - age structured model with 10 age classes 
@@ -206,9 +205,9 @@ cat("
     # - marray_age_recruit_immat tries to create a loop over immature age classes rather than specify each age separately
     # -------------------------------------------------
     
-    #-------------------------------------------------  
-    # 1. PRIORS FOR ALL DATA SETS
-    #-------------------------------------------------
+#-------------------------------------------------  
+# 1. PRIORS FOR ALL DATA SETS
+#-------------------------------------------------
     
     
     # -------------------------------------------------        
@@ -218,7 +217,7 @@ cat("
     for (t in 1:T){  
       ann.fec[t] ~ dunif(0.05,0.65) ## dnorm(0.32,10) T(0.001,0.999)        ## Informative Priors on fecundity based on Wanless et al 2009
     } #t
-
+    
     
     # -------------------------------------------------        
     # 1.2. Priors and constraints FOR POPULATION COUNTS
@@ -229,169 +228,133 @@ cat("
         tau.obs[s,t]<-pow(sigma.obs[s,t],-2)
       }
     }
-
-
+    
+    
     # -------------------------------------------------        
     # 1.3. Priors and constraints FOR SURVIVAL
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    for (gy in 1:2){
+    for (gy in 1:2){    ## for good and poor monitoring years
       mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
       mean.p.ad[gy] ~ dunif(0.2, 1)	           # Prior for mean adult recapture - should be higher than 20%
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0,1)
-
+    agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
+    
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
       for (j in 1:t){ ## zero by definition (these are never actually used)
-          p.juv[t,j] <- 0
-        }
-        for (j in (t+1):(n.occasions-1)){
-          logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + eps.p[j] + agebeta*(j - t)
-        }
+        p.juv[t,j] <- 0
       }
-
+      for (j in (t+1):(n.occasions-1)){
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + eps.p[j] + agebeta*(j - t)
+      }
+    }
+    
     ## PRIORS FOR RANDOM EFFECTS
     sigma.p ~ dunif(0, 1)                # Prior for standard deviation
     tau.p <- pow(sigma.p, -2)
-
+    
     
     ### SURVIVAL PROBABILITY
     mean.phi.juv ~ dunif(0.5, 0.9)             # Prior for mean juvenile survival first year 0.757, second year 0.973 in Laysan albatross
     mean.phi.ad ~ dunif(0.7, 1)             # Prior for mean adult survival - should be higher than 70%
     mu.juv <- log(mean.phi.juv / (1-mean.phi.juv)) # Logit transformation
     mu.ad <- log(mean.phi.ad / (1-mean.phi.ad)) # Logit transformation
-
+    
     ## PRIORS FOR RANDOM EFFECTS
     sigma.phi ~ dunif(0, 1)                # Prior for standard deviation
     tau.phi <- pow(sigma.phi, -2)
     
     ## RANDOM TIME EFFECT ON SURVIVAL AND ADULT RECAPTURE
-      for (j in 1:(n.occasions-1)){
-        logit(phi.juv[j]) <- mu.juv + eps.phi[j]
-        logit(phi.ad[j]) <- mu.ad + eps.phi[j]
-        eps.phi[j] ~ dnorm(0, tau.phi) 
-        logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]
-        eps.p[j] ~ dnorm(0, tau.p)
-      }
-
-
-
-    #-------------------------------------------------  
-    # 2. LIKELIHOODS AND ECOLOGICAL STATE MODEL
-    #-------------------------------------------------
+    for (j in 1:(n.occasions-1)){
+      logit(phi.juv[j]) <- mu.juv + eps.phi[j]
+      logit(phi.ad[j]) <- mu.ad + eps.phi[j]
+      eps.phi[j] ~ dnorm(0, tau.phi) 
+      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]
+      eps.p[j] ~ dnorm(0, tau.p)
+    }
+    
+    
+    
+#-------------------------------------------------  
+# 2. LIKELIHOODS AND ECOLOGICAL STATE MODEL
+#-------------------------------------------------
     
     # -------------------------------------------------        
     # 2.1. System process: female based matrix model
     # -------------------------------------------------
     
+    ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
+    ## ADJUSTED BASED ON PAST POPULATION SIZES
+
+      IM[1,1,1] ~ dunif(200,700)                                 ### number of 1-year old survivors 
+      IM[1,1,2] <- 0
+      IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
+    
+      for(age in 2:30) {
+        IM[1,age,1] ~ dbin(pow(phi.ad[25],(age-1)), max(1,round(IM[1,age-1,3])))
+        IM[1,age,2] <- 0
+        IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
+      }
+      N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters
+
+      Ntot.breed[1] ~ dunif(1500,2000) ###   ### sum of counts is 2400, but we take average over 3 years because 2001 was an outlier year
+      JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
+      N.atsea[1] ~ dunif(100,1000)
+      Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea
+ 
+   
+    ### FOR EVERY SUBSEQUENT YEAR POPULATION PROCESS
+
     for (tt in 2:T){
     
       ## THE PRE-BREEDING YEARS ##
-
-        ## define recruit probability for various ages ##
-        # logit(p.juv.recruit2[tt])<-mu.p.juv[goodyear[tt+24]] + eps.p[tt+24] + (agebeta * 2)
-        # logit(p.juv.recruit3[tt])<-mu.p.juv[goodyear[tt+24]] + eps.p[tt+24] + (agebeta * 3)
-        # logit(p.juv.recruit4[tt])<-mu.p.juv[goodyear[tt+24]] + eps.p[tt+24] + (agebeta * 4)
-        # logit(p.juv.recruit5[tt])<-mu.p.juv[goodyear[tt+24]] + eps.p[tt+24] + (agebeta * 5)
-        # logit(p.juv.recruit6[tt])<-mu.p.juv[goodyear[tt+24]] + eps.p[tt+24] + (agebeta * 6)
-
-        ## recruit probability
-        for (age in 1:30) {
-          logit(p.juv.recruit[age,tt])<-mu.p.juv[2] + eps.p[tt+24] + (agebeta * age)
-        }
-
-
-      # nestlings[tt] <- ann.fec[tt] * 0.5 * Ntot.breed[tt]                                                     ### number of locally produced FEMALE chicks
-      # JUV[tt] ~ dpois(nestlings[tt])                                                                     ### need a discrete number otherwise dbin will fail, dpois must be >0
-      # N1[tt]  ~ dbin(mean.phi.juv, round(JUV[tt-1]))                                                    ### number of 1-year old survivors 
-      # N2[tt] ~ dbin(phi.ad[tt+24], round(N1[tt-1]))                                                      ### number of 2-year old survivors
-      # N2recruit[tt] ~ dbin(p.juv.recruit2[tt], round(N2[tt]))                                             ### number of 2-year old birds that return to Gough
-      # N3[tt] ~ dbin(phi.ad[tt+24], round(N2[tt-1]-N2recruit[tt-1]))                                                       ### number of 3-year old survivors
-      # N3recruit[tt] ~ dbin(p.juv.recruit3[tt], round(N3[tt]))                                             ### number of 3-year old birds that return to Gough
-      # N4[tt] ~ dbin(phi.ad[tt+24], round(N3[tt-1]-N3recruit[tt-1]))                                                       ### number of 4-year old survivors
-      # N4recruit[tt] ~ dbin(p.juv.recruit4[tt], round(N4[tt]))                                             ### number of 4-year old birds that return to Gough
-      # N5[tt] ~ dbin(phi.ad[tt+24], round(N4[tt-1]-N4recruit[tt-1]))                                                       ### number of 4-year old survivors
-      # N5recruit[tt] ~ dbin(p.juv.recruit5[tt], round(N5[tt]))                                             ### number of 5-year old birds that return to Gough
-      # Noldrecruit[tt] ~ dbin(p.juv.recruit6[tt], round(N.notrecruited.surv[tt]))                                             ### number of older immature birds that return to Gough
-      # N.recruits[tt] <- N2recruit[tt] + N3recruit[tt] + N4recruit[tt] + N5recruit[tt] + Noldrecruit[tt]  ### number of this years recruiters
-      # N.notrecruited.surv[tt] ~ dbin(phi.ad[tt+24], round(N.notrecruited[tt-1]))                        ### number of older immature survivors that have not recruited 
-      # N.notrecruited[tt] <-round((N.notrecruited.surv[tt]-Noldrecruit[tt])+(N5[tt]-N5recruit[tt]))                         ### number of birds not yet recruited at the end of this year
-      # 
-    ## IMMATURE MATRIX WITH 3 columns:
-    # 1: survivors from previous year
-    # 2: recruits in current year
-    # 3: unrecruited in current year (available for recruitment next year)
-
+    
+      ## define recruit probability for various ages ##
+      for (age in 1:30) {
+        logit(p.juv.recruit[age,tt])<-mu.p.juv[2] + eps.p[tt+24] + (agebeta * age)
+      }
+    
+    
+      ## IMMATURE MATRIX WITH 3 columns:
+      # 1: survivors from previous year
+      # 2: recruits in current year
+      # 3: unrecruited in current year (available for recruitment next year)
+    
       nestlings[tt] <- ann.fec[tt] * 0.5 * Ntot.breed[tt]                                                     ### number of locally produced FEMALE chicks
       JUV[tt] ~ dpois(nestlings[tt])                                                                     ### need a discrete number otherwise dbin will fail, dpois must be >0
       IM[tt,1,1] ~ dbin(phi.juv[tt+24], max(1,round(JUV[tt-1])))                                  ### number of 1-year old survivors 
       IM[tt,1,2] <- 0
       IM[tt,1,3] <- IM[tt,1,1] - IM[tt,1,2]
     
-    for(age in 2:30) {
-      IM[tt,age,1] ~ dbin(phi.ad[tt+24], max(1,round(IM[tt-1,age-1,3])))
-      IM[tt,age,2] <- min(round(IM[tt,age-1,3]),IM[tt,age,1])*p.juv.recruit[age,tt]
-      IM[tt,age,3] <- IM[tt,age,1] - IM[tt,age,2]
-    }
-    N.recruits[tt] <- sum(IM[tt,,2])  ### number of this years recruiters
+      for(age in 2:30) {
+        IM[tt,age,1] ~ dbin(phi.ad[tt+24], max(1,round(IM[tt-1,age-1,3])))
+        IM[tt,age,2] <- min(round(IM[tt,age-1,3]),IM[tt,age,1])*p.juv.recruit[age,tt]
+        IM[tt,age,3] <- IM[tt,age,1] - IM[tt,age,2]
+      }
+      N.recruits[tt] <- sum(IM[tt,,2])  ### number of this years recruiters
     
-
+    
       ## THE BREEDING POPULATION ##
       # Ntot.breed comprised of first-time breeders, previous skippers, and previous unsuccessful breeders
       # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
-
+    
       N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
       N.breed.ready[tt] ~ dbin(p.ad[tt+24], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
       Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
       N.atsea[tt] <- round(N.ad.surv[tt]-N.breed.ready[tt])                     ### potential breeders that remain at sea    
-      
+    
       ### THE TOTAL TRAL POPULATION ###
       Ntot[tt]<-sum(IM[tt,,3]) + Ntot.breed[tt]+N.atsea[tt]  ## total population size is all the immatures plus adult breeders and adults at sea
-
+    
     } # tt
     
+
+
     
-    
-    ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
-    ## ADJUSTED BASED ON PAST POPULATION SIZES
-    # p.juv.recruit2[1]<-0
-    # p.juv.recruit3[1]<-0
-    # p.juv.recruit5[1]<-0
-    # p.juv.recruit6[1]<-0
-
-    IM[1,1,1] ~ dunif(200,700)                                 ### number of 1-year old survivors 
-    IM[1,1,2] <- 0
-    IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
-    
-    for(age in 2:30) {
-      IM[1,age,1] ~ dbin(pow(phi.ad[25],(age-1)), max(1,round(IM[1,age-1,3])))
-      IM[1,age,2] <- 0
-      IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
-    }
-    N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters
-    
-
-
-
-    Ntot.breed[1] ~ dunif(1500,2000) ###   ### sum of counts is 2400, but we take average over 3 years because 2001 was an outlier year
-    JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
-    # N1[1] ~ dunif(200,700)  ##<-round(JUV[1]*mean.phi.juv)
-    # N2[1] ~ dunif(100,600)  ##<-round(N1[1]*mean.phi.juv)
-    # N2recruit[1] <- 0 
-    # N3[1] ~ dunif(300,800)  ## very large number of birds due to 2400 breeders in 2001 <-round(N2[1]*mean.phi.juv)
-    # N3recruit[1] <- 0 
-    # N4[1] ~ dunif(100,400)  ##<-round(N3[1]*mean.phi.juv)
-    # logit(p.juv.recruit4[1]) <- mu.p.juv[goodyear[25]] + eps.p[25] + agebeta*(4)
-    # N4recruit[1] ~ dbin(p.juv.recruit4[1],round(N4[1]))
-    # N.notrecruited[1] ~ dunif(50,800)  ### all birds not recruited, including those from 1999 bumper year <-round(N4[1]*mean.phi.juv*0.9)                         ### number of birds not yet recruited ~90% at age 4
-    N.atsea[1] ~ dunif(100,1000)
-    Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea
-
-
     # -------------------------------------------------        
     # 2.2. Observation process for population counts: state-space model of annual counts
     # -------------------------------------------------
@@ -404,11 +367,12 @@ cat("
         y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s,t])								# Distribution for random error in observed numbers (counts)
       }														# run this loop over t= nyears
     }		## end site loop
-
+    
     
     # -------------------------------------------------        
     # 2.3. Likelihood for fecundity: Logistic regression from the number of surveyed broods
     # -------------------------------------------------
+
     for (t in 1:(T-1)){
       J[t] ~ dbin(ann.fec[t], R[t])
     } #	close loop over every year in which we have fecundity data
@@ -450,171 +414,134 @@ cat("
         pr.a[t,j] <- 0
       } #j
     } #t
-
-  # Last column: probability of non-recapture
-  for (t in 1:(n.occasions-1)){
-    pr.j[t,n.occasions] <- 1-sum(pr.j[t,1:(n.occasions-1)])
-    pr.a[t,n.occasions] <- 1-sum(pr.a[t,1:(n.occasions-1)])
-  } #t
-
     
-    #-------------------------------------------------  
-    # 3. DERIVED PARAMETERS FOR OUTPUT REPORTING
-    #-------------------------------------------------
+    # Last column: probability of non-recapture
+    for (t in 1:(n.occasions-1)){
+      pr.j[t,n.occasions] <- 1-sum(pr.j[t,1:(n.occasions-1)])
+      pr.a[t,n.occasions] <- 1-sum(pr.a[t,1:(n.occasions-1)])
+    } #t
     
-
+    
+#-------------------------------------------------  
+# 3. DERIVED PARAMETERS FOR OUTPUT REPORTING
+#-------------------------------------------------
+    
+    
     ## DERIVED POPULATION GROWTH RATE PER YEAR
     for (t in 1:(T-1)){
       lambda[t]<-Ntot[t+1]/max(1,Ntot[t])  ## division by 0 creates invalid parent value
     }		## end year loop
-
-    ## DERIVED ADULT BREEDING PROPENSITY (=resighting probability) AND JUVENILE RECRUITING PROBABILITY
-    #mean.propensity <- sum(p.ad[1:(n.occasions-1)]*(goodyear-1))/sum((goodyear-1))
-    logit(mean.recruit) <- mu.p.juv[2] + agebeta*5
     
     ## DERIVED MEAN FECUNDITY 
     mean.fec <- mean(ann.fec)
     pop.growth.rate <- exp((1/(T-1))*sum(log(lambda[1:(T-1)])))   # Geometric mean
-
-
-    #-------------------------------------------------  
-    # 4. PROJECTION INTO FUTURE
-    #-------------------------------------------------
-    ## includes 3 scenarios
-    ## scenario 1: projection with no changes in demography
-    ## scenario 2: successful mouse eradication in 2021 - fecundity doubles
-    ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
-
-    ## define recruit probability for various ages ##
-    # logit(p.juv.recruit2.f)<-mu.p.juv[2] + (agebeta * 2)
-    # logit(p.juv.recruit3.f)<-mu.p.juv[2] + (agebeta * 3)
-    # logit(p.juv.recruit4.f)<-mu.p.juv[2] + (agebeta * 4)
-    # logit(p.juv.recruit5.f)<-mu.p.juv[2] + (agebeta * 5)
-    # logit(p.juv.recruit6.f)<-mu.p.juv[2] + (agebeta * 30)
-
+    
+    
+#-------------------------------------------------  
+# 4. PROJECTION INTO FUTURE
+#-------------------------------------------------
+  ## includes 3 scenarios
+  ## scenario 1: projection with no changes in demography
+  ## scenario 2: successful mouse eradication in 2021 - fecundity doubles
+  ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
+    
     ## recruit probability
     for (age in 1:30) {
       logit(p.juv.recruit.f[age])<-mu.p.juv[2] + (agebeta * age)
     }
 
 
-for(scen in 1:n.scenarios){
-
-    ### COPY POPULATIONS FROM LAST YEAR OF DATA SERIES
-
+  # -------------------------------------------------        
+  # 4.1. System process for future
+  # -------------------------------------------------
+        
+  ## LOOP OVER EACH SCENARIO  
+  for(scen in 1:n.scenarios){
+    
+    ### ~~~~~~~~~~ COPY POPULATIONS FROM LAST YEAR OF DATA SERIES FOR FIRST FUTURE YEAR ~~~~~~~~~###
+    
     ## IMMATURE MATRIX WITH 3 columns:
     # 1: survivors from previous year
     # 2: recruits in current year
     # 3: unrecruited in current year (available for recruitment next year)
-    nestlings.f[scen,1] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed.f[scen,1])                       ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
+
+    nestlings.f[scen,1] ~ dbin(fut.fec.change[scen]*mean.fec*0.5,round(Ntot.breed.f[scen,1]))                      ### number of locally produced FEMALE chicks based on average fecundity 
     IM.f[scen,1,1,1] ~ dbin(mean.phi.juv, max(1,round(JUV[T])))                                  ### number of 1-year old survivors 
     IM.f[scen,1,1,2] <- 0
     IM.f[scen,1,1,3] <- IM.f[scen,1,1,1] - IM.f[scen,1,1,2]
     
     for(age in 2:30) {
       IM.f[scen,1,age,1] ~ dbin(mean.phi.ad, max(1,round(IM[T,age-1,3])))
-      IM.f[scen,1,age,2] <- min(round(IM.f[scen,T,age-1,3]),IM.f[scen,1,age,1])*p.juv.recruit.f[age]
+      IM.f[scen,1,age,2] <- min(round(IM[T,age-1,3]),IM.f[scen,1,age,1])*p.juv.recruit.f[age]
       IM.f[scen,1,age,3]   <- IM.f[scen,1,age,1] - IM.f[scen,1,age,2]
     }
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
     
-
-    # nestlings.f[scen,1] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed[T])                                             ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
-    # N1.f[scen,1]  ~ dbin(mean.phi.juv, max(1,round(nestlings[T])))                                                    ### number of 1-year old survivors 
-    # N2.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N1[T])))                                                      ### number of 2-year old survivors
-    # N2recruit.f[scen,1] ~ dbin(p.juv.recruit2.f, round(N2.f[scen,1]))                                             ### number of 2-year old birds that return to Gough
-    # N3.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N2[T]-N2recruit[T])))                                                       ### number of 3-year old survivors
-    # N3recruit.f[scen,1] ~ dbin(p.juv.recruit3.f, round(N3.f[scen,1]))                                             ### number of 3-year old birds that return to Gough
-    # N4.f[scen,1] ~ dbin(mean.phi.ad, max(1,round(N3[T]-N3recruit[T])))                                                       ### number of 4-year old survivors
-    # N4recruit.f[scen,1] ~ dbin(p.juv.recruit4.f, round(N4.f[scen,1]))                                             ### number of 4-year old birds that return to Gough
-    # N5.f[scen,1] ~ dbin(mean.phi.ad, round(N4[T]-N4recruit[T]))                                                       ### number of 5-year old survivors
-    # N5recruit.f[scen,1] ~ dbin(p.juv.recruit5.f, round(N5.f[scen,1]))                                             ### number of 5-year old birds that return to Gough
-    # Noldrecruit.f[scen,1] ~ dbin(p.juv.recruit6.f, round(N.notrecruited.surv.f[scen,1]))                                             ### number of older immature birds that return to Gough
-    # N.recruits.f[scen,1] <- N2recruit.f[scen,1] + N3recruit.f[scen,1] + N4recruit.f[scen,1] + N5recruit.f[scen,1] + Noldrecruit.f[scen,1]  ### number of this years recruiters
-    # N.notrecruited.f[scen,1] <-round((N.notrecruited.surv.f[scen,1]-Noldrecruit.f[scen,1])+(N5.f[scen,1]-N5recruit.f[scen,1]))                         ### number of birds not yet recruited at the end of this year
-    # N.notrecruited.surv.f[scen,1] ~ dbin(mean.phi.ad, round(N.notrecruited[T]))                        ### number of older immature survivors that have not recruited 
-
-    N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))           ### previous year's adults that survive
-    N.breed.ready.f[scen,1] ~ dbin(mean.p.ad[2], round(N.ad.surv.f[scen,1]))                  ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
-    Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])              ### number of counted breeders is sum of old breeders returning and first recruits
-    N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])                     ### potential breeders that remain at sea
-    N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because tey bred successfully
-      
+    N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))              ### previous year's adults that survive
+    N.breed.ready.f[scen,1] ~ dbin(mean.p.ad[2], round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
+    Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])            ### number of counted breeders is sum of old breeders returning and first recruits
+    N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])               ### potential breeders that remain at sea
+    N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because they bred successfully
+    
     ### THE TOTAL TRAL POPULATION ###
     Ntot.f[scen,1]<-sum(IM.f[scen,1,,3])+Ntot.breed.f[scen,1]+N.atsea.f[scen,1]  ## total population size is all the immatures plus adult breeders and adults at sea
 
-   
+
+    
+    ### ~~~~~~~~~~ LOOP OVER ALL SUBSEQUENT FUTURE YEARS ~~~~~~~~~###
+
     for (tt in 2:FUT.YEAR){
     
-
-    # -------------------------------------------------        
-    # 4.1. System process for future
-    # -------------------------------------------------
-
-    ## INCLUDE CARRYING CAPACITY OF 2500 breeding pairs (slightly more than maximum ever counted)
-    carr.capacity[scen,tt] ~ dnorm(2500,0.05)
+  
+      ## INCLUDE CARRYING CAPACITY OF 2500 breeding pairs (slightly more than maximum ever counted)
+      carr.capacity[scen,tt] ~ dnorm(2500,0.05)
     
-    ## THE PRE-BREEDING YEARS ##
-    ## because it goes for 30 years, all pops must be safeguarded to not become 0 because that leads to invald parent error
+      ## THE PRE-BREEDING YEARS ##
+      ## because it goes for 30 years, all pops must be safeguarded to not become 0 because that leads to invald parent error
     
-    # nestlings.f[scen,tt] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed.f[scen,tt])                       ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
-    # N1.f[scen,tt]  ~ dbin(mean.phi.juv, max(1,round(nestlings.f[scen,tt-1])))                                              ### number of 1-year old survivors 
-    # N2.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N1.f[scen,tt-1])))                                                      ### number of 2-year old survivors
-    # N2recruit.f[scen,tt] ~ dbin(p.juv.recruit2.f, round(N2.f[scen,tt]))                                             ### number of 2-year old birds that return to Gough
-    # N3.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N2.f[scen,tt-1]-N2recruit.f[scen,tt-1])))                                                       ### number of 3-year old survivors
-    # N3recruit.f[scen,tt] ~ dbin(p.juv.recruit3.f, round(N3.f[scen,tt]))                                             ### number of 3-year old birds that return to Gough
-    # N4.f[scen,tt] ~ dbin(mean.phi.ad, max(1,round(N3.f[scen,tt-1]-N3recruit.f[scen,tt-1])))                                                       ### number of 4-year old survivors
-    # N4recruit.f[scen,tt] ~ dbin(p.juv.recruit4.f, round(N4.f[scen,tt]))                                             ### number of 4-year old birds that return to Gough
-    # N5.f[scen,tt] ~ dbin(mean.phi.ad, round(N4.f[scen,tt-1]-N4recruit.f[scen,tt-1]))                                            ### number of 5-year old survivors
-    # N5recruit.f[scen,tt] ~ dbin(p.juv.recruit5.f, round(N5.f[scen,tt]))                                             ### number of 5-year old birds that return to Gough
-    # Noldrecruit.f[scen,tt] ~ dbin(p.juv.recruit6.f, round(N.notrecruited.surv.f[scen,tt]))                                             ### number of older immature birds that return to Gough
-    # N.recruits.f[scen,tt] <- N2recruit.f[scen,tt] + N3recruit.f[scen,tt] + N4recruit.f[scen,tt] + N5recruit.f[scen,tt] + Noldrecruit.f[scen,tt]  ### number of this years recruiters
-    # N.notrecruited.f[scen,tt] <-round((N.notrecruited.surv.f[scen,tt]-Noldrecruit.f[scen,tt])+(N5.f[scen,tt]-N5recruit.f[scen,tt]))                         ### number of birds not yet recruited at the end of this year
-    # N.notrecruited.surv.f[scen,tt] ~ dbin(mean.phi.ad, round(N.notrecruited.f[scen,tt-1]))                        ### number of older immature survivors that have not recruited 
-
-
-    ## IMMATURE MATRIX WITH 3 columns:
-    # 1: survivors from previous year
-    # 2: recruits in current year
-    # 3: unrecruited in current year (available for recruitment next year)
-    nestlings.f[scen,tt] <- round(fut.fec.change[scen]*mean.fec* 0.5 * Ntot.breed.f[scen,tt])                       ### number of locally produced FEMALE chicks based on average fecundity - to use just one take ann.fec[FUT.int[tt]] 
-    IM.f[scen,tt,1,1] ~ dbin(mean.phi.juv, max(1,round(nestlings.f[scen,tt-1])))                                  ### number of 1-year old survivors 
-    IM.f[scen,tt,1,2] <- 0
-    IM.f[scen,tt,1,3] <- IM.f[scen,tt,1,1] - IM.f[scen,tt,1,2]
-
-    for(age in 2:30) {
-      IM.f[scen,tt,age,1] ~ dbin(mean.phi.ad, max(1,round(IM.f[scen,tt-1,age-1,3])))
-      IM.f[scen,tt,age,2] <- min(round(IM.f[scen,tt-1,age-1,3]),IM.f[scen,tt,age,1])*p.juv.recruit.f[age]
-      IM.f[scen,tt,age,3]   <- IM.f[scen,tt,age,1] - IM.f[scen,tt,age,2]
-    }
-    N.recruits.f[scen,tt] <- sum(IM.f[scen,tt,,2])  ### number of this years recruiters
-
-    ## THE BREEDING POPULATION ##
+      ## IMMATURE MATRIX WITH 3 columns:
+      # 1: survivors from previous year
+      # 2: recruits in current year
+      # 3: unrecruited in current year (available for recruitment next year)
+      nestlings.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec*0.5,round(Ntot.breed.f[scen,tt]))                       ### number of locally produced FEMALE chicks based on average fecundity
+      IM.f[scen,tt,1,1] ~ dbin(mean.phi.juv, max(1,round(nestlings.f[scen,tt-1])))                                  ### number of 1-year old survivors 
+      IM.f[scen,tt,1,2] <- 0
+      IM.f[scen,tt,1,3] <- IM.f[scen,tt,1,1] - IM.f[scen,tt,1,2]
+    
+      for(age in 2:30) {
+        IM.f[scen,tt,age,1] ~ dbin(mean.phi.ad, max(1,round(IM.f[scen,tt-1,age-1,3])))
+        IM.f[scen,tt,age,2] <- min(round(IM.f[scen,tt-1,age-1,3]),IM.f[scen,tt,age,1])*p.juv.recruit.f[age]
+        IM.f[scen,tt,age,3] <- IM.f[scen,tt,age,1] - IM.f[scen,tt,age,2]
+      }
+      N.recruits.f[scen,tt] <- sum(IM.f[scen,tt,,2])  ### number of this years recruiters
+    
+      ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.prev.succ.f[scen,tt] ~ dbin(fut.surv.change[scen]*mean.phi.ad, round(N.succ.breed.f[scen,tt-1]))                  ### these birds will  remain at sea because tey bred successfully
       N.breed.ready.f[scen,tt] ~ dbin(min(0.99,(mean.p.ad[2]/(1-mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of survivors that returns, with fecundity partialled out of return probability
       Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
       N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because tey bred successfully
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt]+N.prev.succ.f[scen,tt])                     ### potential breeders that remain at sea    
-
-    ### THE TOTAL TRAL POPULATION ###
-    Ntot.f[scen,tt]<-sum(IM.f[scen,tt,,3])+Ntot.breed.f[scen,tt]+N.atsea.f[scen,tt]  ## total population size is all the immatures plus adult breeders and adults at sea
-
-
+    
+      ### THE TOTAL TRAL POPULATION ###
+      Ntot.f[scen,tt]<-sum(IM.f[scen,tt,,3])+Ntot.breed.f[scen,tt]+N.atsea.f[scen,tt]  ## total population size is all the immatures plus adult breeders and adults at sea
+    
+    
     } ### end future loop
     
     ## CALCULATE ANNUAL POP GROWTH RATE ##
-      for (fut2 in 1:(FUT.YEAR-1)){
-        fut.lambda[scen,fut2] <- Ntot.f[scen,fut2+1]/max(1,Ntot.f[scen,fut2])                                 ### inserted safety to prevent denominator being 0
-      } # fut2
+    for (fut2 in 1:(FUT.YEAR-1)){
+      fut.lambda[scen,fut2] <- Ntot.f[scen,fut2+1]/max(1,Ntot.f[scen,fut2])                                 ### inserted safety to prevent denominator being 0
+    } # fut2
     
-
+    
     ## DERIVED MEAN FUTURE GROWTH RATE 
     fut.growth.rate[scen] <- exp((1/(FUT.YEAR-1))*sum(log(fut.lambda[scen,1:(FUT.YEAR-1)])))   # Geometric mean
-
-} # end future projection scenarios
+    
+  } # end future projection scenarios
     
 }  ## end model loop
+
 ",fill = TRUE)
 sink()
 
@@ -669,17 +596,17 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv")  
 
 # MCMC settings
-ni <- 350
+ni <- 3500
 nt <- 4
-nb <- 150
+nb <- 1500
 nc <- 3
 
 
 
 # RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
-TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
-                    #Rhat.limit=1.5, max.iter=150000)  
+TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
+                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
+                    Rhat.limit=1.2, max.iter=350000)  
 
 
 
