@@ -243,7 +243,7 @@ model {
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
+    agebeta ~ dunif(0.4,1)    # Prior for shape of increase in juvenile recapture probability with age
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -618,9 +618,9 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv","agebeta")  
 
 # MCMC settings
-ni <- 75000
+ni <- 125000
 nt <- 5
-nb <- 25000
+nb <- 50000
 nc <- 3
 
 
