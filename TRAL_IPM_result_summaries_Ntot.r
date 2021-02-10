@@ -49,13 +49,13 @@ export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
   #               seq(2004,2020,1),   ## ann.fec
   #               rep(seq(1979.5,2020.5,1),each=2), ##  juv and adult survival
   #               rep(NA,10))) %>%
-  mutate(Year=c(seq(2004,2020,1),   ## for ann.fec
-                rep(NA,9),         ## for mean phi, p, and growth rates
-                seq(2004,2020,1),   ## for N.tot
-                rep(seq(2021,2050,1),each=3), ##  for Ntot.f with 3 scenarios
-                seq(2004,2019,1), ##  for lambda 
-                seq(1978,2020,1), ##  for p.ad 
-                rep(NA,1))) %>%     ## for deviance
+  mutate(Year=c(#seq(2004,2020,1),   ## for ann.fec
+                rep(NA,7),         ## for mean phi, p, and growth rates
+                seq(2004,2021,1),   ## for N.tot
+                rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
+                #seq(2004,2020,1), ##  for lambda 
+                rep(seq(1979,2020,1), each=2), ##  for phi.ad and phi.juv
+                rep(NA,2))) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("ann.fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
   mutate(demographic=ifelse(grepl("p.ad",parameter,perl=T,ignore.case = T)==T,"breed.propensity",demographic))%>%

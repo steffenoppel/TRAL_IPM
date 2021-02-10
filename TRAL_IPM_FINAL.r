@@ -292,40 +292,40 @@ model {
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
     ## ADJUSTED BASED ON PAST POPULATION SIZES WIT CHICK COUNTS SINCE 1999
 
-      IM[1,1,1] ~ dunif(250,400)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003
+      IM[1,1,1] ~ dnorm(324,10)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003
       IM[1,1,2] <- 0
       IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
 
-      IM[1,2,1] ~ dunif(150,300)                                 ### number of 2-year old survivors is very low because very few chicks hatched in 2002
+      IM[1,2,1] ~ dnorm(257,10)                                 ### number of 2-year old survivors is very low because very few chicks hatched in 2002
       IM[1,2,2] <- 0
       IM[1,2,3] <- IM[1,1,1] - IM[1,1,2]
 
-      IM[1,3,1] ~ dunif(350,500)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001
+      IM[1,3,1] ~ dnorm(462,10)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001
       IM[1,3,2] <- 0
       IM[1,3,3] <- IM[1,1,1] - IM[1,1,2]
 
-      IM[1,4,1] ~ dunif(100,250)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000
+      IM[1,4,1] ~ dnorm(207,10)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000
       IM[1,4,2] <- 0
       IM[1,4,3] <- IM[1,1,1] - IM[1,1,2]
     
-      IM[1,5,1] ~ dunif(600,800)                                 ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999
+      IM[1,5,1] ~ dnorm(700,5)                                 ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999
       IM[1,5,2] <- 0
       IM[1,5,3] <- IM[1,1,1] - IM[1,1,2]
 
-      IM[1,6,1] ~ dunif(100,500)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously
+      IM[1,6,1] ~ dunif(150,300)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously
       IM[1,6,2] <- 0
       IM[1,6,3] <- IM[1,1,1] - IM[1,1,2]
     
       for(age in 7:30) {
-        IM[1,age,1] ~ dbin(pow(phi.ad[25],(age-1)), round(IM[1,age-1,3]))
+        IM[1,age,1] ~ dbin(pow(mean.phi.ad,(age-1)), round(IM[1,age-1,3]))
         IM[1,age,2] <- 0
         IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
       }
       N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters - irrelevant in year 1 as already included in Ntot.breed prior
 
-      Ntot.breed[1] ~ dnorm(1869,10)  ### sum of counts is 1869
-      JUV[1] ~ dnorm(510,10)          ### sum of chicks is 510
-      N.atsea[1] ~ dunif(400,1000)    ### unknown number
+      Ntot.breed[1] ~ dnorm(1869,100)  ### sum of counts is 1869
+      JUV[1] ~ dnorm(510,100)          ### sum of chicks is 510
+      N.atsea[1] ~ dnorm(530,10)    ### unknown number
       Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea
  
    
@@ -618,17 +618,17 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv","agebeta")  
 
 # MCMC settings
-ni <- 3500
-nt <- 4
-nb <- 1500
+ni <- 75000
+nt <- 5
+nb <- 25000
 nc <- 3
 
 
 
 # RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
-TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.2, max.iter=350000)  
+TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
+                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
+                    Rhat.limit=1.5, max.iter=100000)  
 
 
 
