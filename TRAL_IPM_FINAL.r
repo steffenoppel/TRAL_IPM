@@ -50,6 +50,8 @@
 ## FINAL IS BASED ON V5 but includes data from 2021 and eliminates all unnecessary code
 ## updated 7 Feb 2021 to include age-dependent recapture probability
 
+## updated 10 February to inform initial population status (Ntot[1]) based on counts of adults and chicks in 1999-2003
+
 
 library(tidyverse)
 library(lubridate)
@@ -288,22 +290,42 @@ model {
     # -------------------------------------------------
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
-    ## ADJUSTED BASED ON PAST POPULATION SIZES
+    ## ADJUSTED BASED ON PAST POPULATION SIZES WIT CHICK COUNTS SINCE 1999
 
-      IM[1,1,1] ~ dunif(200,700)                                 ### number of 1-year old survivors 
+      IM[1,1,1] ~ dunif(250,400)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003
       IM[1,1,2] <- 0
       IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
+
+      IM[1,2,1] ~ dunif(150,300)                                 ### number of 2-year old survivors is very low because very few chicks hatched in 2002
+      IM[1,2,2] <- 0
+      IM[1,2,3] <- IM[1,1,1] - IM[1,1,2]
+
+      IM[1,3,1] ~ dunif(350,500)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001
+      IM[1,3,2] <- 0
+      IM[1,3,3] <- IM[1,1,1] - IM[1,1,2]
+
+      IM[1,4,1] ~ dunif(100,250)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000
+      IM[1,4,2] <- 0
+      IM[1,4,3] <- IM[1,1,1] - IM[1,1,2]
     
-      for(age in 2:30) {
-        IM[1,age,1] ~ dbin(pow(phi.ad[25],(age-1)), max(1,round(IM[1,age-1,3])))
+      IM[1,5,1] ~ dunif(600,800)                                 ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999
+      IM[1,5,2] <- 0
+      IM[1,5,3] <- IM[1,1,1] - IM[1,1,2]
+
+      IM[1,6,1] ~ dunif(100,500)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously
+      IM[1,6,2] <- 0
+      IM[1,6,3] <- IM[1,1,1] - IM[1,1,2]
+    
+      for(age in 7:30) {
+        IM[1,age,1] ~ dbin(pow(phi.ad[25],(age-1)), round(IM[1,age-1,3]))
         IM[1,age,2] <- 0
         IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
       }
-      N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters
+      N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters - irrelevant in year 1 as already included in Ntot.breed prior
 
-      Ntot.breed[1] ~ dunif(1500,2000) ###   ### sum of counts is 2400, but we take average over 3 years because 2001 was an outlier year
-      JUV[1]<-round(Ntot.breed[1]*0.5*ann.fec[1])
-      N.atsea[1] ~ dunif(100,1000)
+      Ntot.breed[1] ~ dnorm(1869,10)  ### sum of counts is 1869
+      JUV[1] ~ dnorm(510,10)          ### sum of chicks is 510
+      N.atsea[1] ~ dunif(400,1000)    ### unknown number
       Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea
  
    
@@ -593,7 +615,7 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
  
 
 # Parameters monitored
-parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv")  
+parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv","agebeta")  
 
 # MCMC settings
 ni <- 3500
