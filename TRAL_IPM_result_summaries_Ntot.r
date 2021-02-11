@@ -27,7 +27,7 @@ select<-dplyr::select
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
-load("TRAL_IPM_output_v5_Ntot.RData")
+load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 
 
 
@@ -50,12 +50,12 @@ export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
   #               rep(seq(1979.5,2020.5,1),each=2), ##  juv and adult survival
   #               rep(NA,10))) %>%
   mutate(Year=c(#seq(2004,2020,1),   ## for ann.fec
-                rep(NA,7),         ## for mean phi, p, and growth rates
+                rep(NA,8),         ## for mean phi, p, and growth rates
                 seq(2004,2021,1),   ## for N.tot
                 rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
                 #seq(2004,2020,1), ##  for lambda 
                 rep(seq(1979,2020,1), each=2), ##  for phi.ad and phi.juv
-                rep(NA,2))) %>%     ## for deviance and agebeta
+                rep(NA,1))) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("ann.fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
   mutate(demographic=ifelse(grepl("p.ad",parameter,perl=T,ignore.case = T)==T,"breed.propensity",demographic))%>%
@@ -65,7 +65,7 @@ export<-as.data.frame(TRALipm$summary) %>% select(c(1,5,2,3,7,8)) %>%
 tail(export)
 hist(export$Rhat)
 
-write.table(export,"TRAL_Gough_IPM_estimates_2020_v5.csv", sep=",", row.names=F)
+write.table(export,"TRAL_Gough_IPM_estimates_2020_v5_agerecruit.csv", sep=",", row.names=F)
 
 
 
@@ -85,7 +85,7 @@ TABLE1<-export %>% mutate(parameter=ifelse(grepl("ann.fec",parameter,perl=T,igno
   filter(!parameter=="mean.fec") %>%
   filter(!grepl("lambda",parameter,perl=T,ignore.case = T)==T)
 
-write.table(TABLE1,"TRAL_demographic_estimates_2020.csv", sep=",", row.names=F)
+write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 
 
 
@@ -93,13 +93,13 @@ write.table(TABLE1,"TRAL_demographic_estimates_2020.csv", sep=",", row.names=F)
 #########################################################################
 # PLOT ADULT RETURN AND RESIGHT PROBABILITY
 #########################################################################
-
-export %>% filter(grepl("p.ad",parameter,perl=T,ignore.case = T)==T) %>%
-  filter(!parameter=="mean.p.ad") %>%
-  arrange(Year) %>%
-  
-  ggplot(aes(x=Year,y=Median)) + geom_point(size=2) + geom_smooth(method='lm')  + theme_bw()
-
+### parameters no longer monitored
+# export %>% filter(grepl("p.ad",parameter,perl=T,ignore.case = T)==T) %>%
+#   filter(!parameter=="mean.p.ad") %>%
+#   arrange(Year) %>%
+#   
+#   ggplot(aes(x=Year,y=Median)) + geom_point(size=2) + geom_smooth(method='lm')  + theme_bw()
+# 
 
 
 

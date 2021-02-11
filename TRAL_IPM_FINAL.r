@@ -52,6 +52,8 @@
 
 ## updated 10 February to inform initial population status (Ntot[1]) based on counts of adults and chicks in 1999-2003
 
+## MODEL CONVERGED ON 11 FEBRUARY 2021 with sensible estimates
+
 
 library(tidyverse)
 library(lubridate)
@@ -243,7 +245,7 @@ model {
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0.4,1)    # Prior for shape of increase in juvenile recapture probability with age
+    agebeta ~ dunif(0.5,1)    # Prior for shape of increase in juvenile recapture probability with age
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -251,7 +253,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + eps.p[j] + agebeta*(j - t)
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t)  ## + eps.p[j]
       }
     }
     
@@ -297,28 +299,28 @@ model {
       IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
 
       IM[1,2,1] ~ dnorm(257,10)                                 ### number of 2-year old survivors is very low because very few chicks hatched in 2002
-      IM[1,2,2] <- 0
+      IM[1,2,2] <- IM[1,2,1]*p.juv.recruit.f[2]
       IM[1,2,3] <- IM[1,1,1] - IM[1,1,2]
 
       IM[1,3,1] ~ dnorm(462,10)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001
-      IM[1,3,2] <- 0
+      IM[1,3,2] <- IM[1,3,1]*p.juv.recruit.f[3]
       IM[1,3,3] <- IM[1,1,1] - IM[1,1,2]
 
       IM[1,4,1] ~ dnorm(207,10)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000
-      IM[1,4,2] <- 0
+      IM[1,4,2] <- IM[1,4,1]*p.juv.recruit.f[4]
       IM[1,4,3] <- IM[1,1,1] - IM[1,1,2]
     
       IM[1,5,1] ~ dnorm(700,5)                                 ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999
-      IM[1,5,2] <- 0
+      IM[1,5,2] <- IM[1,5,1]*p.juv.recruit.f[5]
       IM[1,5,3] <- IM[1,1,1] - IM[1,1,2]
 
       IM[1,6,1] ~ dunif(150,300)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously
-      IM[1,6,2] <- 0
+      IM[1,6,2] <- IM[1,6,1]*p.juv.recruit.f[6]
       IM[1,6,3] <- IM[1,1,1] - IM[1,1,2]
     
       for(age in 7:30) {
         IM[1,age,1] ~ dbin(pow(mean.phi.ad,(age-1)), round(IM[1,age-1,3]))
-        IM[1,age,2] <- 0
+        IM[1,age,2] <- IM[1,age,1]*p.juv.recruit.f[age]
         IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
       }
       N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters - irrelevant in year 1 as already included in Ntot.breed prior
@@ -326,7 +328,7 @@ model {
       Ntot.breed[1] ~ dnorm(1869,100)  ### sum of counts is 1869
       JUV[1] ~ dnorm(510,100)          ### sum of chicks is 510
       N.atsea[1] ~ dnorm(530,10)    ### unknown number
-      Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea
+      Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea - does not include recruits in Year 1
  
    
     ### FOR EVERY SUBSEQUENT YEAR POPULATION PROCESS
@@ -615,7 +617,7 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
  
 
 # Parameters monitored
-parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","Ntot","Ntot.f","phi.ad","phi.juv","agebeta")  
+parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","agebeta","Ntot","Ntot.f","phi.ad","phi.juv")  
 
 # MCMC settings
 ni <- 125000
@@ -625,10 +627,10 @@ nc <- 3
 
 
 
-# RUN THE FOUR SCENARIOS {took 2 hours for niter=150000)
+# RUN THE MODEL {took 3 hours for niter=125000)
 TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
-                    Rhat.limit=1.5, max.iter=100000)  
+                    #Rhat.limit=1.5, max.iter=100000)  
 
 
 
