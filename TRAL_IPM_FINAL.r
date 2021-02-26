@@ -241,11 +241,11 @@ model {
     ### RECAPTURE PROBABILITY
     for (gy in 1:2){    ## for good and poor monitoring years
       mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
-      mean.p.ad[gy] ~ dunif(0.2, 1)	           # Prior for mean adult recapture - should be higher than 20%
+      mean.p.ad[gy] ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0.5,1)    # Prior for shape of increase in juvenile recapture probability with age
+    agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -253,7 +253,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t)  ## + eps.p[j]
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) + eps.p[j]
       }
     }
     
@@ -620,17 +620,17 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.recruit","pop.growth.rate","fut.growth.rate","agebeta","Ntot","Ntot.f","phi.ad","phi.juv")  
 
 # MCMC settings
-ni <- 125000
+ni <- 125
 nt <- 5
-nb <- 50000
+nb <- 50
 nc <- 3
 
 
 
 # RUN THE MODEL {took 3 hours for niter=125000)
-TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, n.iter = ni)
-                    #Rhat.limit=1.5, max.iter=100000)  
+TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
+                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
+                    Rhat.limit=1.5, max.iter=500000)  
 
 
 
