@@ -253,7 +253,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) + eps.p[j]
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) #+ eps.p[j]
       }
     }
     
@@ -611,7 +611,15 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          mean.phi.juv = runif(1, 0.5, 0.9),
                          mean.p.ad = runif(2, 0.2, 1),
                          mean.p.juv = runif(2, 0, 1),
-                         Ntot.breed= c(runif(1, 1500, 2000),rep(NA,n.years-1)),
+                         Ntot.breed= c(runif(1, 4950, 5050),rep(NA,n.years-1)),
+                         JUV= c(rnorm(1, 1869, 0.1),rep(NA,n.years-1)),
+                         N.atsea= c(rnorm(1, 530, 0.1),rep(NA,n.years-1)),
+                         # IM[,1,1]= c(rnorm(1, 324, 0.1),rep(NA,n.years-1)),
+                         # IM[,2,1]= c(rnorm(1, 257, 0.1),rep(NA,n.years-1)),
+                         # IM[,3,1]= c(rnorm(1, 462, 0.1),rep(NA,n.years-1)),
+                         # IM[,4,1]= c(rnorm(1, 207, 0.1),rep(NA,n.years-1)),
+                         # IM[,5,1]= c(rnorm(1, 700, 0.1),rep(NA,n.years-1)),
+                         # IM[,6,1]= c(runif(1, 150, 300),rep(NA,n.years-1)),
                          sigma.obs=matrix(runif(n.sites*n.years,1,20),ncol=n.years))}
 
  
@@ -622,7 +630,7 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.
 # MCMC settings
 ni <- 125
 nt <- 5
-nb <- 50
+nb <- 50000
 nc <- 3
 
 
@@ -630,7 +638,7 @@ nc <- 3
 # RUN THE MODEL {took 3 hours for niter=125000)
 TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.5, max.iter=500000)  
+                    Rhat.limit=1.5, max.iter=300000)  
 
 
 
