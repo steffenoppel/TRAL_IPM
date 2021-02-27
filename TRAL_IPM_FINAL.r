@@ -54,6 +54,8 @@
 
 ## MODEL CONVERGED ON 11 FEBRUARY 2021 with sensible estimates
 
+## survival model requires 'agebeta' prior to be set to 0.5 or higher, otherwise it will not converge
+
 
 library(tidyverse)
 library(lubridate)
@@ -206,7 +208,7 @@ model {
     # - marray_simplified_v5 includes two values for p (high and low monitoring effort years) and sets p.juv to 0 for first year.
     # - marray_simplified_v5 also calculates mean propensity and recruitment from annual values for good monitoring years.
     # - marray_age_recruit allows for varying juvenile recapture probability with age.
-    # - marray_age_recruit_immat tries to create a loop over immature age classes rather than specify each age separately
+    # - marray_age_recruit_immat creates a loop over immature age classes rather than specify each age separately
     # -------------------------------------------------
     
 #-------------------------------------------------  
@@ -245,7 +247,7 @@ model {
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
+    agebeta ~ dunif(0.5,1)    # Prior for shape of increase in juvenile recapture probability with age
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -253,7 +255,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) #+ eps.p[j]
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) + eps.p[j]
       }
     }
     
@@ -630,7 +632,7 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity","mean.
 # MCMC settings
 ni <- 125
 nt <- 5
-nb <- 50000
+nb <- 25000
 nc <- 3
 
 
@@ -638,7 +640,7 @@ nc <- 3
 # RUN THE MODEL {took 3 hours for niter=125000)
 TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat.jags",
                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.5, max.iter=300000)  
+                    Rhat.limit=1.5, max.iter=100000)  
 
 
 
@@ -659,6 +661,7 @@ save.image("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 
 
 
+plogis(0.123*seq(1:30))
 
 
 

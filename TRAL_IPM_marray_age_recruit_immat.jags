@@ -19,7 +19,7 @@ model {
     # - marray_simplified_v5 includes two values for p (high and low monitoring effort years) and sets p.juv to 0 for first year.
     # - marray_simplified_v5 also calculates mean propensity and recruitment from annual values for good monitoring years.
     # - marray_age_recruit allows for varying juvenile recapture probability with age.
-    # - marray_age_recruit_immat tries to create a loop over immature age classes rather than specify each age separately
+    # - marray_age_recruit_immat creates a loop over immature age classes rather than specify each age separately
     # -------------------------------------------------
     
 #-------------------------------------------------  
@@ -58,7 +58,7 @@ model {
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
-    agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
+    agebeta ~ dunif(0.5,1)    # Prior for shape of increase in juvenile recapture probability with age
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -66,7 +66,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) #+ eps.p[j]
+        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) + eps.p[j]
       }
     }
     
