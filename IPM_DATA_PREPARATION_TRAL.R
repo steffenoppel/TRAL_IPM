@@ -290,9 +290,9 @@ n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
   group_by(Contact_Year) %>%
   summarise(N_marked=sum(count)) %>%
   arrange(Contact_Year) %>%
-  mutate(N_all = cumsum(N_marked)) %>%
-  bind_rows(tibble(Contact_Year=2021,N_marked=0,N_all=0)) %>%
-  mutate(N_all=if_else(Contact_Year==2021,dplyr::lag(N_all),N_all))
+  mutate(N_all = cumsum(N_marked))
+  #bind_rows(tibble(Contact_Year=2021,N_marked=0,N_all=0)) %>%
+  #mutate(N_all=if_else(Contact_Year==2021,dplyr::lag(N_all),N_all))
 tail(n_exist)
 
 goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
