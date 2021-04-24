@@ -12,6 +12,7 @@ recversion<-list.files(pattern="Gough_CMR_BackEnd")
 
 db <- odbcConnectAccess2007(recversion)
 contacts<- sqlQuery(db, "SELECT * FROM EXPORT_TRAL_contacts_nest_info")
+contactsbreed<- sqlQuery(db, "SELECT * FROM EXPORT_TRAL_contacts_breeding_status")
 metalside<- sqlQuery(db, "SELECT * FROM qry_loc_of_metal_ring")
 ages<- sqlQuery(db, "SELECT * FROM Deployment_Age_BirdID")
 bands<-sqlQuery(db, "SELECT * FROM qry_federal_ring_per_BirdID")
