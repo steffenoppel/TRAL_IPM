@@ -136,8 +136,16 @@ POPSIZE<-counts %>% filter(Species==SP) %>%
 POPSIZE
 
 ### PLOT TO SPOT ANY OUTLIERS OF COUNT DATA
-POPSIZE %>% gather(key="Colony",value="N",-Year) %>% group_by(Year) %>% summarise(TOT=sum(N, na.rm=T)) %>%
-ggplot(aes(x=Year,y=TOT)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') 
+POPSIZE %>% gather(key="Colony",value="N",-Year) %>% group_by(Year) %>% summarise(TOT=sum(N, na.rm=T)) %>% #summarise(avg=median(TOT))
+ggplot(aes(x=Year,y=TOT)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') +
+  theme(panel.background=element_rect(fill="white", colour="black"),  
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),  
+        strip.text.x=element_text(size=18, color="black"),  
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        panel.border = element_blank()) 
 
 
 ### summary of population counts of fledglings per year and colony
@@ -176,6 +184,19 @@ counts %>% filter(Colony=='Gonydale' & year(Date)==2017)
 
 dim(POPSIZE)
 dim(CHICKCOUNT)
+
+
+### PLOT TO SPOT ANY OUTLIERS OF COUNT DATA
+BS %>% mutate(Year=POPSIZE$Year) %>% gather(key="Colony",value="N",-Year) %>% group_by(Year) %>% summarise(SUCCESS=mean(N, na.rm=T)) %>% ##ungroup() %>% summarise(avg=median(SUCCESS, na.rm=T),low=min(SUCCESS, na.rm=T),hi=max(SUCCESS, na.rm=T))
+ggplot(aes(x=Year,y=SUCCESS)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') + 
+theme(panel.background=element_rect(fill="white", colour="black"),  
+      axis.text=element_text(size=18, color="black"), 
+      axis.title=element_text(size=20),  
+      strip.text.x=element_text(size=18, color="black"),  
+      strip.background=element_rect(fill="white", colour="black"), 
+      panel.grid.major = element_blank(),  
+      panel.grid.minor = element_blank(),  
+      panel.border = element_blank()) 
 
 
 
@@ -302,7 +323,17 @@ goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise
 tail(goodyears)
 
 ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.03)
-ggplot(goodyears) + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=p.sel), stat="identity")
+
+goodyears %>% mutate(Effort=if_else(prop.seen<0.1,"low","high")) %>%
+ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity") + 
+  theme(panel.background=element_rect(fill="white", colour="black"),  
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),  
+        strip.text.x=element_text(size=18, color="black"),  
+        strip.background=element_rect(fill="white", colour="black"), 
+        panel.grid.major = element_blank(),  
+        panel.grid.minor = element_blank(),  
+        panel.border = element_blank()) 
 
 
 
@@ -320,6 +351,11 @@ TRAL_CHICK<- contacts %>% mutate(count=1) %>%
   spread(key=Contact_Year, value=STATE, fill=0) %>%
   arrange(BirdID)
 dim(TRAL_CHICK)
+
+### identify number of chicks ringed every year
+phi.juv.possible<-TRAL_CHICK %>% gather(key='Year', value='count',-BirdID) %>% group_by(Year) %>% summarise(N=sum(count)) %>% mutate(JuvSurv=if_else(N<70,0,1))
+phi.juv.possible$JuvSurv
+
 
 TRAL_AD<- contacts %>% mutate(count=1) %>%
   group_by(BirdID,FIRST_AGE,Contact_Year) %>%
@@ -342,7 +378,7 @@ cap <- apply(CH.J, 1, sum)
 ind <- which(cap >= 2)
 CH.J.R <- CH.J[ind,]    # Juvenile CH recaptured at least once
 CH.J.N <- CH.J[-ind,]   # Juvenile CH never recaptured
-
+dim(CH.J.R)
 
 # FOR THOSE CHICKS THAT WERE RECAPTURED, Remove first capture and add the rest to the adult encounter history
 first <- numeric()
@@ -450,6 +486,15 @@ ggplot(RECRUIT.AGE) + geom_bar(aes(x=age,y=prop),stat='identity', fill='cornflow
         panel.grid.major = element_blank(),  
         panel.grid.minor = element_blank(),  
         panel.border = element_blank()) 
+
+
+
+### IDENTIFY THE CONTACTS OF AGE <4 TO DOUBLE-CHECK IN DATABASE
+DOUBLE_CHECK<-contacts %>% filter(ContAge %in% c(1,2)) %>%
+  arrange(BirdID,Date_Time)
+
+contacts %>% filter(BirdID %in% unique(DOUBLE_CHECK$BirdID)) %>%
+  arrange(BirdID,Date_Time)
 
 
 
