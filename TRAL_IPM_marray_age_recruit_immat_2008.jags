@@ -129,7 +129,7 @@ model {
       IM[1,5,2] <- IM[1,5,1]*p.juv.recruit.f[5]
       IM[1,5,3] <- IM[1,1,1] - IM[1,1,2]
 
-      IM[1,6,1] ~ dunif(167,10)                                 ### very uncertain number of of 6-year old survivors based on number of chicks hatched in 2002
+      IM[1,6,1] ~ dnorm(167,10)                                 ### very uncertain number of of 6-year old survivors based on number of chicks hatched in 2002
       IM[1,6,2] <- IM[1,6,1]*p.juv.recruit.f[6]
       IM[1,6,3] <- IM[1,1,1] - IM[1,1,2]
     
