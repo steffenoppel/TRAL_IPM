@@ -353,7 +353,10 @@ TRAL_CHICK<- contacts %>% mutate(count=1) %>%
 dim(TRAL_CHICK)
 
 ### identify number of chicks ringed every year
-phi.juv.possible<-TRAL_CHICK %>% gather(key='Year', value='count',-BirdID) %>% group_by(Year) %>% summarise(N=sum(count)) %>% mutate(JuvSurv=if_else(N<70,0,1))
+phi.juv.possible<-TRAL_CHICK %>% gather(key='Year', value='count',-BirdID) %>% group_by(Year) %>% summarise(N=sum(count)) %>%
+  mutate(JuvSurv=if_else(N<50,0,1)) %>%
+  mutate(JuvSurv=if_else(Year>2018,0,JuvSurv)) ### not possible yet to estimate juvenile survival after 2018
+
 phi.juv.possible$JuvSurv
 
 
