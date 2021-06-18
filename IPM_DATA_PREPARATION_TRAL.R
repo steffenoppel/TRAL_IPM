@@ -10,6 +10,7 @@
 ## completely revised on 5 Jan 2021 to incorporate m-array survival estimation in IPM
 ## 23 January 2021: fixed one data error (chick ringed in 1977) and set p.juv to 0 for first year after marking -> results in more sensible estimates
 
+## 18 June 2021: changed data preparation back to 2004, after 2008 model run did not improve convergence
 
 library(tidyverse)
 library(lubridate)
