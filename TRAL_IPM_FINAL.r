@@ -98,7 +98,7 @@ TRAL.pop[14,4]<-136   ### number of nests monitored in Gonydale that year
 
 ## COMBINE SITES THAT WERE AMBIGUOUSLY DEFINED OVER TIME 
 TRAL.pop<-TRAL.pop %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2007) %>%   ### changed from 2003
+  filter(Year>2003) %>%   ### changed from 2003
   mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
   mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
   group_by(Year,Site) %>%
@@ -142,7 +142,7 @@ TRAL.chick[TRAL.chick$Year==2013,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2013,4]*
 TRAL.chick[TRAL.chick$Year==2014,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2014,4]*TRAL.bs$BREED_SUCC[TRAL.bs$Year==2014])
 
 TRAL.chick<-TRAL.chick %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2007) %>%  ### changed from 2003
+  filter(Year>2003) %>%  ### changed from 2003
   mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
   mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
   group_by(Year,Site) %>%
