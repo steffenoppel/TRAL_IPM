@@ -59,8 +59,7 @@
 ## short version initiated 5 June 2021: reduce data series by another 4 years and start in 2008 rather than 2004 to improve data quality
 ## short version redacted 18 June 2021 - did not improve convergence
 
-## TO DO
-## future survival decrease needs to be phased in gradually
+## 1 July 2021: revised input data (eliminated duplicate chick counts in 2011 and 2012)
 
 
 
