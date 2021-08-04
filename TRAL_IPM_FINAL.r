@@ -68,6 +68,7 @@ library(tidyverse)
 library(lubridate)
 library(data.table)
 library(jagsUI)
+library(runjags)   ## added by Beth in July 2021 because jagsUI would not converge
 filter<-dplyr::filter
 select<-dplyr::select
 
@@ -675,11 +676,21 @@ nc <- 3
 
 # RUN THE MODEL {took 3 hours for niter=125000)
 ## _logscale model requires log(R) as input for count data
-TRALipm <- jags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
-                    n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-                    Rhat.limit=1.2, max.iter=200000)  
+## THIS DOES NOT CONVERGE
+# TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
+#                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
+#                     Rhat.limit=1.2, max.iter=200000)  
 
+nt <- 10
+nb <- 25000
+nad <- 2000
+nc <- 3
+ns <- 200000 #longest
 
+TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
+                    model="C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
+                    n.chains = nc, thin = nt, burnin = nb, adapt = nad,sample = ns, 
+                    method = "rjparallel") 
 
 
 
