@@ -66,6 +66,14 @@ write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names
 
 
 #########################################################################
+# SUMMARIES FOR TEXT
+#########################################################################
+
+PROD.DAT$R[PROD.DAT$R<1000]<-NA
+summary(lm(R~Year,data=PROD.DAT))
+
+
+#########################################################################
 # PRODUCE TABLE 1 THAT SUMMARISES DEMOGRAPHIC RATES
 #########################################################################
 
@@ -95,13 +103,9 @@ write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 ## scenario 2: successful mouse eradication in 2021 - fecundity doubles
 ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
-## CHANGED ON 4 MAY 2020 to address Andrew Callender's concerns
 
 # LOAD AND MANIPULATE ICONS TO REMOVE BACKGROUND
-require(png)
 library(grid)
-library(gtable)
-require(jpeg)
 library(magick)
 
 
@@ -130,7 +134,7 @@ ggplot(plot1_df) +
   ## add the breeding pair count data
   geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),col="black", size=2.5)+
   geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),method="lm",se=T,col="grey12", size=1)+
-  ylab("\nGlobal Tristan Albatross Population Size (Individuals)") +
+  ylab("\nGlobal Tristan Albatross Population Size (Individuals)\n") +
   xlab("Year") +
   scale_y_continuous(breaks=seq(0,20000,2000), limits=c(0,20000))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
@@ -143,13 +147,26 @@ ggplot(plot1_df) +
         axis.title=element_text(size=20),
         legend.text=element_text(size=14),
         legend.title = element_text(size=16),
-        legend.position=c(0.1,0.9),
+        legend.position=c(0.26,0.9),
         #panel.grid.major = element_blank(), 
         #panel.border = element_blank(),
         panel.grid.minor = element_blank())
 
 #ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios.pdf", width=14, height=8)
 ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
+
+
+
+
+#########################################################################
+# CALCULATE BENEFIT OF ERADICATION
+#########################################################################
+
+plot1_df %>% filter(Year==2050) %>% 
+  mutate(benefit=max(Median)/min(Median),
+         benefit.lcl=max(lcl)/min(lcl),
+         benefit.ucl=max(ucl)/min(ucl))
+
 
 
 

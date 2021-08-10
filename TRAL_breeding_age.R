@@ -212,7 +212,7 @@ firstreturns<-contacts %>%
   filter((Contact_Year==FirstReturn)) %>%
   select(ContactID,BirdID,Contact_Year,FIRST_YEAR,ContAge,n,N_marked,prop.seen,FirstReturn) %>%
   rename(effort=n) %>%
-  filter(Contact_Year>2003) 
+  filter(Contact_Year>2003)
 dim(firstreturns)
 
 
