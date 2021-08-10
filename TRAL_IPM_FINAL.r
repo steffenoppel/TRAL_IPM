@@ -661,7 +661,7 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 # Parameters monitored
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "mean.recruit","pop.growth.rate","fut.growth.rate",
-                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv",
+                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
                 "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
                 "mean.p.sd","sigma.p","sigma.phi")
@@ -699,8 +699,37 @@ TRALipm <- run.jags(data=jags.data, inits=inits, parameters,
 #########################################################################
 ### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
 
+## updated script for 'runjags' output
+summary_tralipm <- summary(TRALipm)
+summary_tralipm_df <- as.data.frame(summary_tralipm)
+View(summary_tralipm_df)
+head(summary_tralipm_df)
+min(summary_tralipm_df$SSeff) #Ntot[1]
+max(summary_tralipm_df$psrf) #Ntot[1]
+
+addsummary_tralipm <- add.summary(TRALipm,plots = runjags.getOption("predraw.plots"))
+addsummary_tralipm #18 min
+
+plot(addsummary_tralipm, layout=c(2,2))
+
+predictions <- data.frame(summary(addsummary_tralipm),
+                          parameter = row.names(summary(addsummary_tralipm)))
+head(predictions)
+row.names(predictions) <- 1:nrow(predictions)
+
+predictions <- predictions[1:200,]
+#predictions[1:5,]
+
+predictions$Mode <- NULL
+np <- names(predictions) 
+names(predictions) <- c("lcl",np[2],"ucl",np[4:9],"Rhat",np[11])
+
+max(predictions$Rhat)
+
+
+
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_v6.RData")
+save.image("TRAL_IPM_output_FINAL.RData")
 
 
 
