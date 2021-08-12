@@ -22,6 +22,11 @@ library(runjags)
 #library(nimble)
 filter<-dplyr::filter
 select<-dplyr::select
+library(grid)
+library(magick)
+imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
+TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
+
 
 
 #########################################################################
@@ -51,7 +56,7 @@ export<-predictions %>%
   )) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
-  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"breed.propensity",demographic))%>%
+  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
   mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
   mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
   mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
@@ -60,7 +65,7 @@ tail(export)
 hist(export$Rhat)
 hist(export$SSeff)
 
-write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names=F)
+#write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names=F)
 
 
 
@@ -69,8 +74,16 @@ write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names
 # SUMMARIES FOR TEXT
 #########################################################################
 
+### change in breeding pop size
 PROD.DAT$R[PROD.DAT$R<1000]<-NA
 summary(lm(R~Year,data=PROD.DAT))
+range(PROD.DAT$R, na.rm=T)
+
+##change in breeding success
+PROD.DAT$J[is.na(PROD.DAT$R)]<-NA
+PROD.DAT$success<-PROD.DAT$J/PROD.DAT$R
+summary(lm(success~Year,data=PROD.DAT))
+range(PROD.DAT$success, na.rm=T)
 
 
 #########################################################################
@@ -104,16 +117,6 @@ write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
 
-# LOAD AND MANIPULATE ICONS TO REMOVE BACKGROUND
-library(grid)
-library(magick)
-
-
-#imgTRAL<-readPNG("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\Alby1 Blue.png")
-#TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
-
-imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
-TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
 ## PREPARE PLOTTING DATAFRAME
 plot1_df <- export %>%
@@ -197,3 +200,40 @@ plot1_df %>% filter(Year==2050) %>%
 #     panel.grid.minor = element_blank()#, 
 #     #panel.border = element_blank()
 #   )
+
+
+
+#########################################################################
+# PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR PRODUCTIVITY
+#########################################################################
+
+PROD.DAT$J[is.na(PROD.DAT$R)]<-NA
+PROD.DAT$success<-PROD.DAT$J/PROD.DAT$R
+summary(lm(success~Year,data=PROD.DAT))
+
+
+## CREATE PLOT FOR POP TREND AND SAVE AS PDF
+ggplot(PROD.DAT) + 
+  geom_point(aes(y=success, x=Year), size=2)+   #
+  geom_smooth(aes(y=success, x=Year),method="lm",se=T,col="grey12", size=1)+
+  ylab("\nBreeding success of Tristan Albatross\n") +
+  xlab("Year") +
+  scale_y_continuous(breaks=seq(0,1,0.2), limits=c(0,1))+
+  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2021))+
+  
+  ### add the bird icons
+  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),
+        legend.text=element_text(size=14),
+        legend.title = element_text(size=16),
+        legend.position=c(0.26,0.9),
+        #panel.grid.major = element_blank(), 
+        #panel.border = element_blank(),
+        panel.grid.minor = element_blank())
+
+#ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios.pdf", width=14, height=8)
+ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
+
