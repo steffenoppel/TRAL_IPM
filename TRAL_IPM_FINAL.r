@@ -717,7 +717,7 @@ predictions <- data.frame(summary(addsummary_tralipm),
 head(predictions)
 row.names(predictions) <- 1:nrow(predictions)
 
-predictions <- predictions[1:200,]
+predictions <- predictions[1:218,]   ### 200 cuts off ann.fec
 #predictions[1:5,]
 
 predictions$Mode <- NULL
@@ -730,15 +730,5 @@ max(predictions$Rhat)
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 save.image("TRAL_IPM_output_FINAL.RData")
-
-
-
-
-
-
-
-
-plogis(0.123*seq(1:30))
-
 
 

@@ -47,12 +47,13 @@ load("TRAL_IPM_output_FINAL.RData")
 
 ## write output into file ##
 export<-predictions %>%
-  mutate(Year=c(#seq(2004,2020,1),   ## for ann.fec
+  mutate(Year=c(
     rep(NA,8),         ## for mean phi, p, and growth rates
     seq(2004,2021,1),   ## for N.tot
     rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
     #seq(2004,2020,1), ##  for lambda 
-    rep(seq(1979,2020,1), each=2) ##  for phi.ad and phi.juv
+    rep(seq(1979,2020,1), 2), ##  for phi.ad and phi.juv
+    seq(2004,2021,1)   ## for ann.fec
   )) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
@@ -60,6 +61,7 @@ export<-predictions %>%
   mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
   mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
   mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
+  rename(Rhat=psrf) %>%
   arrange(demographic,Year)
 tail(export)
 hist(export$Rhat)
@@ -73,6 +75,7 @@ hist(export$SSeff)
 #########################################################################
 # SUMMARIES FOR TEXT
 #########################################################################
+## NEED TO DO: base these regressions on IPM estimates
 
 ### change in breeding pop size
 PROD.DAT$R[PROD.DAT$R<1000]<-NA
@@ -82,8 +85,11 @@ range(PROD.DAT$R, na.rm=T)
 ##change in breeding success
 PROD.DAT$J[is.na(PROD.DAT$R)]<-NA
 PROD.DAT$success<-PROD.DAT$J/PROD.DAT$R
-summary(lm(success~Year,data=PROD.DAT))
-range(PROD.DAT$success, na.rm=T)
+#summary(lm(success~Year,data=PROD.DAT))
+bsout<-export %>% filter(demographic=="fecundity") %>% filter(!is.na(Year)) %>%
+  select(Year,Median,Lower95,Upper95)
+summary(lm(Median~Year,data=bsout))
+range(bsout$Median, na.rm=T)
 
 
 #########################################################################
@@ -206,20 +212,17 @@ plot1_df %>% filter(Year==2050) %>%
 #########################################################################
 # PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR PRODUCTIVITY
 #########################################################################
-
-PROD.DAT$J[is.na(PROD.DAT$R)]<-NA
-PROD.DAT$success<-PROD.DAT$J/PROD.DAT$R
-summary(lm(success~Year,data=PROD.DAT))
-
+bsout<-bsout %>% filter(Year<2021)
 
 ## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-ggplot(PROD.DAT) + 
-  geom_point(aes(y=success, x=Year), size=2)+   #
-  geom_smooth(aes(y=success, x=Year),method="lm",se=T,col="grey12", size=1)+
+ggplot(bsout) + 
+  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   #
+  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
+  geom_smooth(aes(y=Median, x=Year),method="lm",se=T,col="grey12", size=1)+
   ylab("\nBreeding success of Tristan Albatross\n") +
   xlab("Year") +
-  scale_y_continuous(breaks=seq(0,1,0.2), limits=c(0,1))+
-  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2021))+
+  scale_y_continuous(breaks=seq(0,0.8,0.2), limits=c(0,0.8))+
+  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2020))+
   
   ### add the bird icons
   #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
