@@ -24,9 +24,6 @@ filter<-dplyr::filter
 select<-dplyr::select
 library(grid)
 library(magick)
-imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
-TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
-
 
 
 #########################################################################
@@ -37,6 +34,8 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 load("TRAL_IPM_output_FINAL.RData")
+imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
+TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
 
 
@@ -108,7 +107,7 @@ TABLE1<-export %>%
                           "mean.phi.ad",
                           "mean.phi.juv" )) 
 
-write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
+#write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 
 
 
@@ -126,6 +125,7 @@ write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 
 ## PREPARE PLOTTING DATAFRAME
 plot1_df <- export %>%
+  rename(lcl=Lower95,ucl=Upper95) %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
   arrange(Year) %>%
   mutate(Scenario="no change") %>%
@@ -136,9 +136,14 @@ plot1_df <- export %>%
 
 
 ## CREATE PLOT FOR POP TREND AND SAVE AS PDF
+
 ggplot(plot1_df) + 
   geom_line(aes(y=Median*2, x=Year, colour=Scenario), size=1)+   #
   geom_ribbon(aes(x=Year, ymin=lcl*2,ymax=ucl*2, fill=Scenario),alpha=0.3)+ #
+  #scale_color_manual(values=c('#4393c3','#d6604d','#b2182b')) +
+  #scale_fill_manual(values=c('#4393c3','#d6604d','#b2182b')) +
+  scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
+  scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
   
   ## add the breeding pair count data
   geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),col="black", size=2.5)+
@@ -157,12 +162,14 @@ ggplot(plot1_df) +
         legend.text=element_text(size=14),
         legend.title = element_text(size=16),
         legend.position=c(0.26,0.9),
-        #panel.grid.major = element_blank(), 
+        panel.grid.major = element_line(size=.1, color="grey94"),
+        #panel.grid.major.y = element_line(size=.1, color="grey37"), 
+        #panel.grid.major.x = element_blank(), 
         #panel.border = element_blank(),
         panel.grid.minor = element_blank())
 
-#ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios.pdf", width=14, height=8)
 ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig1.jpg", width=14, height=8)
 
 
 
@@ -171,13 +178,23 @@ ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
 # CALCULATE BENEFIT OF ERADICATION
 #########################################################################
 
+### MAXIMUM BENEFIT ###
 plot1_df %>% filter(Year==2050) %>% 
   mutate(benefit=max(Median)/min(Median),
          benefit.lcl=max(lcl)/min(lcl),
          benefit.ucl=max(ucl)/min(ucl))
 
+### MINIMUM BENEFIT ###
+plot1_df %>% filter(Year==2050) %>% 
+  mutate(benefit=max(Median)/median(Median),
+         benefit.lcl=max(lcl)/median(lcl),
+         benefit.ucl=max(ucl)/median(ucl))
 
-
+### BENEFIT EVEN WITH FAILURE ###
+plot1_df %>% filter(Year==2050) %>% 
+  mutate(benefit=median(Median)/min(Median),
+         benefit.lcl=median(lcl)/min(lcl),
+         benefit.ucl=median(ucl)/min(ucl))
 
 
 
@@ -237,6 +254,5 @@ ggplot(bsout) +
         #panel.border = element_blank(),
         panel.grid.minor = element_blank())
 
-#ggsave("TRAL_IPM_pop_trend_Gough_2001_2050_3scenarios.pdf", width=14, height=8)
-ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS2.jpg", width=14, height=8)
 
