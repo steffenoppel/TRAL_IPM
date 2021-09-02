@@ -5,9 +5,9 @@
 ### written by Steffen Oppel in August 2021
 ### steffen.oppel@rspb.org.uk
 ### examines 3 question re TRAL breeding age:
-## 1. does average age of all TRAL individuals contacted in a given year change over time?
+## 1. does average age of all TRAL first recruiters in a given year change over time? [This is potentially effort-dependent]
 ## 2. does average age of all TRAL breeders in a given year change over time?
-## 3. does average age of all TRAL first recruiters in a given year change over time? [This is potentially effort-dependent]
+## 3. does average age of all TRAL individuals contacted in a given year change over time? - not used in manuscript as age increases due to length of time since ringing was started
 
 
 library(tidyverse)
@@ -26,13 +26,13 @@ start<-1978  ## for CMR data
 IPMstart<-2000 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
-#system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
-system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+#system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
 load("GOUGH_seabird_CMR_data.RData")
 
 ## run the RODBC import of nest and count data in a 32-bit version of R
-#system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
+system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 #system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
@@ -137,41 +137,106 @@ tail(goodyears)
 
 
 
+
+
+
+
+
 #############################################################################
-##   QUESTION 1: does age of all recorded bird change over time? ###############
+##   QUESTION 1: does age of first returners change over time? ###############
 #############################################################################
-head(contacts)
-dim(contacts)
-returns<-contacts %>%
-  filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
-  group_by(BirdID,Contact_Year) %>%
-  summarise(ContAge=mean(ContAge)) %>%
+firstreturnyear<-contacts %>%
+  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
+  filter(!(FIRST_YEAR==Contact_Year)) %>%
+  group_by(BirdID) %>%
+  summarise(FirstReturn=min(Contact_Year))
+
+firstreturns<-contacts %>%
+  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
   left_join(goodyears, by="Contact_Year") %>%
-  filter(Contact_Year>2003) 
-dim(returns)
+  left_join(firstreturnyear, by="BirdID") %>%
+  filter((Contact_Year==FirstReturn)) %>%
+  select(ContactID,BirdID,Contact_Year,FIRST_YEAR,ContAge,n,N_marked,prop.seen,FirstReturn) %>%
+  rename(effort=n) %>%
+  filter(Contact_Year>2003)
+dim(firstreturns)
 
 
 ### exploratory plots
-ggplot(returns) +
-  geom_point(aes(x=Contact_Year, y=ContAge)) +
+ggplot(firstreturns) +
+  geom_point(aes(x=Contact_Year, y=ContAge), position=position_jitter()) +
   geom_smooth(aes(x=Contact_Year, y=ContAge),method="lm")
 
-ggplot(returns) +
+ggplot(firstreturns) +
   geom_histogram(aes(x=ContAge))
 
 ### analysis
-m1eff<-glm(ContAge~Contact_Year, data=returns, family="poisson",weights=prop.seen)
-#m1n<-glm(ContAge~Contact_Year, data=returns, family="poisson",weights=n)
-#m1<-glm(ContAge~Contact_Year, data=returns, family="poisson")
-summary(m1eff)
-#summary(m1n)
-#summary(m1)
+m3eff<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson",weights=prop.seen)
+summary(m3eff)
+m3n<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson",weights=effort)
+summary(m3n)
+m3<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson")
+summary(m3)
+
+
+### prediction of effect size
+newdat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
+#newdat$pred.age<-predict(m3eff, newdat=newdat, type="response", se=T)$fit
+#newdat$se.age<-predict(m3eff, newdat=newdat, type="response", se=T)$se.fit
+#newdat<-newdat %>% mutate(lcl=pred.age-1.96 * se.age,ucl=pred.age+1.96 * se.age)
+
+## grad the inverse link function
+ilink <- family(m3eff)$linkinv
+## add fit and se.fit on the **link** scale
+newdat <- bind_cols(newdat, setNames(as_tibble(predict(m3eff, newdat, se.fit = TRUE)[1:2]),
+                                     c('fit_link','se_link')))
+## create the interval and backtransform
+newdat <- mutate(newdat,
+                 pred.age  = ilink(fit_link),
+                 ucl = ilink(fit_link + (1.96 * se_link)),
+                 lcl = ilink(fit_link - (1.96 * se_link)))
+
+
+
+
+# LOAD AND MANIPULATE ICONS
+library(grid)
+library(magick)
+imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
+TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
+
+### plot predicted effect size
+ggplot(newdat) +
+  geom_line(aes(x=Contact_Year, y=pred.age),colour = "blue") +
+  geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl), alpha = 0.2,fill = "blue") +
+  geom_point(data=firstreturns,aes(x=Contact_Year, y=ContAge), colour="grey45",size=0.7,position=position_jitter()) +
+  
+  ylab("Age (years) of first return to Gough") +
+  xlab("Year") +
+  scale_y_continuous(breaks=seq(0,30,5), limits=c(0,32))+
+  scale_x_continuous(breaks=seq(2005,2021,2), limits=c(2004,2021))+
+  
+  ### add the bird icons
+  annotation_custom(TRALicon, xmin=2004, xmax=2006, ymin=25, ymax=30) +
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),
+        panel.grid.minor = element_blank())
+
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig2.jpg", width=9, height=6)
+
+
+
+
 
 
 
 #############################################################################
 ##   QUESTION 2: does age of breeders change over time? ###############
 #############################################################################
+
+### this requires the breeding status ID to be added to the access query
 
 breeders<-contacts %>%
   filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
@@ -220,7 +285,7 @@ dim(youngbreeders)
 
 ### analysis of trend over time
 
-m2qeff<-glm(cbind(n.young,n.old)~Contact_Year+I(Contact_Year^2), data=youngbreeders, family="binomial")
+m2qeff<-glm(cbind(n.young,n.old)~Contact_Year+I(Contact_Year^2), data=youngbreeders, family="binomial", weights=prop.seen)
 summary(m2qeff)
 
 m2leff<-glm(cbind(n.young,n.old)~Contact_Year, data=youngbreeders, family="binomial", weights=prop.seen)
@@ -231,9 +296,9 @@ summary(m2leff)
 newdat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
 
 ## grad the inverse link function
-ilink <- family(m2qeff)$linkinv
+ilink <- family(m2leff)$linkinv
 ## add fit and se.fit on the **link** scale
-newdat <- bind_cols(newdat, setNames(as_tibble(predict(m2qeff, newdat, se.fit = TRUE)[1:2]),
+newdat <- bind_cols(newdat, setNames(as_tibble(predict(m2leff, newdat, se.fit = TRUE)[1:2]),
                                      c('fit_link','se_link')))
 ## create the interval and backtransform
 newdat <- mutate(newdat,
@@ -241,14 +306,6 @@ newdat <- mutate(newdat,
                  ucl = ilink(fit_link + (1.96 * se_link)),
                  lcl = ilink(fit_link - (1.96 * se_link)))
 
-
-
-
-# LOAD AND MANIPULATE ICONS
-library(grid)
-library(magick)
-imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
-TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
 ### plot predicted effect size
 ggplot(newdat) +
@@ -276,86 +333,35 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig3.jpg", width=9, height=
 
 
 
-#############################################################################
-##   QUESTION 3: does age of first returners change over time? ###############
-#############################################################################
-firstreturnyear<-contacts %>%
-  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
-  filter(!(FIRST_YEAR==Contact_Year)) %>%
-  group_by(BirdID) %>%
-  summarise(FirstReturn=min(Contact_Year))
-
-firstreturns<-contacts %>%
-  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
+#################################################################################################################
+##   QUESTION 3: does age of all recorded bird change over time? ABANDONED BECAUSE NOT MEANINGFUL ###############
+#################################################################################################################
+head(contacts)
+dim(contacts)
+returns<-contacts %>%
+  filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
+  group_by(BirdID,Contact_Year) %>%
+  summarise(ContAge=mean(ContAge)) %>%
   left_join(goodyears, by="Contact_Year") %>%
-  left_join(firstreturnyear, by="BirdID") %>%
-  filter((Contact_Year==FirstReturn)) %>%
-  select(ContactID,BirdID,Contact_Year,FIRST_YEAR,ContAge,n,N_marked,prop.seen,FirstReturn) %>%
-  rename(effort=n) %>%
-  filter(Contact_Year>2003)
-dim(firstreturns)
+  filter(Contact_Year>2003) 
+dim(returns)
 
 
 ### exploratory plots
-ggplot(firstreturns) +
-  geom_point(aes(x=Contact_Year, y=ContAge), position=position_jitter()) +
+ggplot(returns) +
+  geom_point(aes(x=Contact_Year, y=ContAge)) +
   geom_smooth(aes(x=Contact_Year, y=ContAge),method="lm")
 
-ggplot(firstreturns) +
+ggplot(returns) +
   geom_histogram(aes(x=ContAge))
 
 ### analysis
-m3eff<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson",weights=prop.seen)
-summary(m3eff)
-m3n<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson",weights=effort)
-summary(m3n)
-m3<-glm(ContAge~Contact_Year, data=firstreturns, family="poisson")
-summary(m3)
-
-
-### prediction of effect size
-newdat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
-#newdat$pred.age<-predict(m3eff, newdat=newdat, type="response", se=T)$fit
-#newdat$se.age<-predict(m3eff, newdat=newdat, type="response", se=T)$se.fit
-#newdat<-newdat %>% mutate(lcl=pred.age-1.96 * se.age,ucl=pred.age+1.96 * se.age)
-
-## grad the inverse link function
-ilink <- family(m3eff)$linkinv
-## add fit and se.fit on the **link** scale
-newdat <- bind_cols(newdat, setNames(as_tibble(predict(m3eff, newdat, se.fit = TRUE)[1:2]),
-                                   c('fit_link','se_link')))
-## create the interval and backtransform
-newdat <- mutate(newdat,
-                pred.age  = ilink(fit_link),
-                ucl = ilink(fit_link + (1.96 * se_link)),
-                lcl = ilink(fit_link - (1.96 * se_link)))
+m1eff<-glm(ContAge~Contact_Year, data=returns, family="poisson",weights=prop.seen)
+#m1n<-glm(ContAge~Contact_Year, data=returns, family="poisson",weights=n)
+#m1<-glm(ContAge~Contact_Year, data=returns, family="poisson")
+summary(m1eff)
+#summary(m1n)
+#summary(m1)
 
 
 
-
-# LOAD AND MANIPULATE ICONS
-library(grid)
-library(magick)
-imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
-TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
-
-### plot predicted effect size
-ggplot(newdat) +
-  geom_line(aes(x=Contact_Year, y=pred.age),colour = "blue") +
-  geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl), alpha = 0.2,fill = "blue") +
-  geom_point(data=firstreturns,aes(x=Contact_Year, y=ContAge), colour="grey45",size=0.7,position=position_jitter()) +
-  
-  ylab("Age (years) of first return to Gough") +
-  xlab("Year") +
-  scale_y_continuous(breaks=seq(0,30,5), limits=c(0,32))+
-  scale_x_continuous(breaks=seq(2005,2021,2), limits=c(2004,2021))+
-  
-  ### add the bird icons
-  annotation_custom(TRALicon, xmin=2004, xmax=2006, ymin=25, ymax=30) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
-        axis.title=element_text(size=20),
-        panel.grid.minor = element_blank())
-
-ggsave("TRAL_recruit_age_time.jpg", width=9, height=6)
