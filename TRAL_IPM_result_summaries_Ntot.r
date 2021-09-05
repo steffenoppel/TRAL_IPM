@@ -128,7 +128,7 @@ plot1_df <- export %>%
   rename(lcl=Lower95,ucl=Upper95) %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
   arrange(Year) %>%
-  mutate(Scenario="no change") %>%
+  mutate(Scenario="past, and no future change") %>%
   mutate(Scenario=if_else(grepl("f\\[2",parameter,perl=T,ignore.case = T), "after successful mouse eradication",if_else(grepl("f\\[3",parameter,perl=T,ignore.case = T),"unsuccessful mouse eradication and worsening impacts",Scenario))) %>%
   mutate(ucl=if_else(ucl>15000,15000,ucl)) %>%
   filter(!(Median<500 & Year<2020)) #%>%
@@ -136,7 +136,7 @@ plot1_df <- export %>%
 
 
 ## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-
+TRAL.pop$line="observed trend"
 ggplot(plot1_df) + 
   geom_line(aes(y=Median*2, x=Year, colour=Scenario), size=1)+   #
   geom_ribbon(aes(x=Year, ymin=lcl*2,ymax=ucl*2, fill=Scenario),alpha=0.3)+ #
@@ -147,11 +147,16 @@ ggplot(plot1_df) +
   
   ## add the breeding pair count data
   geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),col="black", size=2.5)+
-  geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),method="lm",se=T,col="grey12", size=1)+
-  ylab("\nGlobal Tristan Albatross Population Size (Individuals)\n") +
-  xlab("Year") +
+  geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
+  #ylab() +
+  #xlab("Year") +
   scale_y_continuous(breaks=seq(0,20000,2000), limits=c(0,20000))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
+  #scale_linetype_manual(name="Breeding population",label="observed trend") +
+  labs(x="Year", y="\nTristan Albatross Population Size (Individuals)\n",
+       col="Total population scenario",
+       fill="Total population scenario",
+       linetype="Breeding population") +
   
   ### add the bird icons
   annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
@@ -161,7 +166,7 @@ ggplot(plot1_df) +
         axis.title=element_text(size=20),
         legend.text=element_text(size=14),
         legend.title = element_text(size=16),
-        legend.position=c(0.26,0.9),
+        legend.position=c(0.26,0.82),
         panel.grid.major = element_line(size=.1, color="grey94"),
         #panel.grid.major.y = element_line(size=.1, color="grey37"), 
         #panel.grid.major.x = element_blank(), 
