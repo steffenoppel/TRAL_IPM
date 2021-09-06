@@ -150,7 +150,7 @@ ggplot(plot1_df) +
   geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
   #ylab() +
   #xlab("Year") +
-  scale_y_continuous(breaks=seq(0,20000,2000), limits=c(0,20000))+
+  scale_y_continuous(breaks=seq(0,18000,2000), limits=c(0,20000),expand = c(0, 0))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
   #scale_linetype_manual(name="Breeding population",label="observed trend") +
   labs(x="Year", y="\nTristan Albatross Population Size (Individuals)\n",
@@ -171,7 +171,8 @@ ggplot(plot1_df) +
         #panel.grid.major.y = element_line(size=.1, color="grey37"), 
         #panel.grid.major.x = element_blank(), 
         #panel.border = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(fill=NA, colour = "black"))
 
 ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
 ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig1.jpg", width=14, height=8)
