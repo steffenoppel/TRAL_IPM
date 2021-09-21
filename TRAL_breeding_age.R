@@ -26,13 +26,13 @@ start<-1978  ## for CMR data
 IPMstart<-2000 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
-system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+#system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
 #system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
 load("GOUGH_seabird_CMR_data.RData")
 
 ## run the RODBC import of nest and count data in a 32-bit version of R
-system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
+#system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 #system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
@@ -158,7 +158,9 @@ firstreturns<-contacts %>%
   filter((Contact_Year==FirstReturn)) %>%
   select(ContactID,BirdID,Contact_Year,FIRST_YEAR,ContAge,n,N_marked,prop.seen,FirstReturn) %>%
   rename(effort=n) %>%
-  filter(Contact_Year>2003)
+  filter(Contact_Year>2003) %>%
+  filter(Contact_Year!=2008) %>%  ### remove the THREE recruiters observed in 2008
+  filter(Contact_Year!=2005)   ### remove the ONLY recruiter observed in 2005!
 dim(firstreturns)
 
 
@@ -229,6 +231,28 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig2.jpg", width=9, height=
 
 
 
+######### ANALYSIS WITH QUANTILE REGRESSION ######
+## makes no big difference, hence discarded
+#install.packages("quantreg")
+# library(quantreg)
+# 
+# firstreturns %>% group_by(Contact_Year) %>% summarise(med=median(ContAge),mean=mean(ContAge))
+# firstreturns %>% filter(Contact_Year==2006)
+# 
+# ### analysis
+# m3eff_rq<-rq(ContAge~Contact_Year, tau=c(0.025, 0.5, 0.975),data=firstreturns, weights=prop.seen)
+# summary(m3eff_rq)
+# plot(m3eff_rq,mfrow = c(1,2))
+# 
+# 
+# plot(firstreturns$Contact_Year,firstreturns$ContAge,cex=.25,type="n",xlab="Year", ylab="Age")
+# points(firstreturns$Contact_Year,firstreturns$ContAge,cex=.5,col="blue")
+# abline(rq(ContAge~Contact_Year, data=firstreturns, weights=prop.seen),col="blue")
+# abline(lm(ContAge~Contact_Year, data=firstreturns, weights=prop.seen),lty=2,col="red") #the mean regression line
+# taus <- c(0.025, 0.975)
+# for(i in 1:length(taus)){
+#   abline(rq(ContAge~Contact_Year, tau=taus[i],data=firstreturns, weights=prop.seen),col="gray")
+#   }
 
 
 
