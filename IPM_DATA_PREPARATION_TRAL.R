@@ -34,13 +34,13 @@ IPMstart<-2000 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
 #system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
-system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+#system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
 load("GOUGH_seabird_CMR_data.RData")
 
 ## run the RODBC import of nest and count data in a 32-bit version of R
 #system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
-system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
+#system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
 
@@ -327,15 +327,26 @@ ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.03)
 
 goodyears %>% mutate(Effort=if_else(prop.seen<0.1,"low","high")) %>%
 ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity") + 
+  
+  labs(x = "Year",
+       y = "Annual proportion of ringed birds recorded",
+       fill = "Effort classification") +
+
   theme(panel.background=element_rect(fill="white", colour="black"),  
         axis.text=element_text(size=18, color="black"), 
         axis.title=element_text(size=20),  
         strip.text.x=element_text(size=18, color="black"),  
         strip.background=element_rect(fill="white", colour="black"), 
         panel.grid.major = element_blank(),  
-        panel.grid.minor = element_blank(),  
+        panel.grid.minor = element_blank(),
+        legend.title=element_text(size=18),
+        legend.text=element_text(size=16),
+        legend.background=element_blank(),
+        legend.key=element_blank(),
+        legend.position=c(0.15, 0.90),
         panel.border = element_blank()) 
 
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS1.jpg", width=9, height=6)
 
 
 
