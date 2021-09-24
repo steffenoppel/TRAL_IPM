@@ -309,7 +309,7 @@ model {
       logit(phi.juv[j]) <- mu.juv + eps.phi[j]*juv.poss[j]
       logit(phi.ad[j]) <- mu.ad + eps.phi[j]
       eps.phi[j] ~ dnorm(0, tau.phi) 
-      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]
+      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]    #### CAT HORSWILL SUGGESTED TO HAVE A CONTINUOUS EFFORT CORRECTION: mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j]
       eps.p[j] ~ dnorm(0, tau.p)
     }
     
@@ -617,6 +617,7 @@ jags.data <- list(marr.j = chick.marray,
                   r.j=apply(chick.marray,1,sum),
                   r.a=apply(adult.marray,1,sum),
                   goodyear=goodyears$p.sel,
+                  #goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
                   juv.poss=phi.juv.possible$JuvSurv, ### sets the annual survival of juveniles to the mean if <70 were ringed
                   
                   ### count data
