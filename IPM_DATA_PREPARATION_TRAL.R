@@ -309,13 +309,25 @@ contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(coun
 
 ## calculate number of individuals that had been marked by a given year
 n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
-  group_by(Contact_Year) %>%
+  mutate(FIRST_AGE=if_else(FIRST_AGE=="Fledgling","Chick",FIRST_AGE)) %>%
+  group_by(Contact_Year,FIRST_AGE) %>%
   summarise(N_marked=sum(count)) %>%
   arrange(Contact_Year) %>%
+  spread(key=FIRST_AGE, value=N_marked, fill=0) %>%
+  ungroup() %>%
+  mutate(N_marked=Adult+Chick) %>%
   mutate(N_all = cumsum(N_marked))
   #bind_rows(tibble(Contact_Year=2021,N_marked=0,N_all=0)) %>%
   #mutate(N_all=if_else(Contact_Year==2021,dplyr::lag(N_all),N_all))
+n_exist$N_all[1] = n_exist$N_marked[1]
+n_exist$N_all[2] = (n_exist$Adult[1]*0.96) + (n_exist$Chick[1]*0.85) + n_exist$N_marked[2]
+n_exist$N_all[3] = (n_exist$N_all[2]*(0.96^19)) + n_exist$N_marked[3]
+n_exist$N_all[4] = (n_exist$Adult[3]*0.96) + (n_exist$Chick[3]*0.85) + (n_exist$N_all[2]*(0.96^19)) + n_exist$N_marked[4]
+for (y in 5:dim(n_exist)[1]) {
+  n_exist$N_all[y] = ((n_exist$Adult[y-1]+n_exist$N_all[y-2])*0.96) + (n_exist$Chick[y-1]*0.85) + n_exist$N_marked[y]
+}
 tail(n_exist)
+
 
 goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
   left_join(n_exist, by='Contact_Year') %>%
@@ -325,7 +337,7 @@ tail(goodyears)
 
 ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.03)
 
-goodyears %>% mutate(Effort=if_else(prop.seen<0.1,"low","high")) %>%
+goodyears %>% mutate(Effort=if_else(prop.seen<0.15,"low","high")) %>%
 ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity") + 
   
   labs(x = "Year",
