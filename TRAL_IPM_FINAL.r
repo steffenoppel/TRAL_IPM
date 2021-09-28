@@ -63,6 +63,8 @@
 
 ## 4 AUGUST 2021: revised priors in model based on Beth Clark's suggestions
 
+## 28 September 2021: changed effort to continuous effect
+
 
 library(tidyverse)
 library(lubridate)
@@ -271,13 +273,14 @@ model {
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    for (gy in 1:2){    ## for good and poor monitoring years
-      mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
-      mean.p.ad[gy] ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
-      mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
-      mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
-    }
+    #for (gy in 1:2){    ## for good and poor monitoring years
+      mean.p.juv ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
+      mean.p.ad ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
+      mu.p.juv <- log(mean.p.juv / (1-mean.p.juv)) # Logit transformation
+      mu.p.ad <- log(mean.p.ad / (1-mean.p.ad)) # Logit transformation
+    #}
     agebeta ~ dunif(0,1)    # Prior for shape of increase in juvenile recapture probability with age
+    beta.p.eff ~ dunif(1,4) # Prior to describe the effort adjustment for increasing detection probability with increasing effort
     
     ## RANDOM TIME EFFECT ON RESIGHTING PROBABILITY OF JUVENILES
     for (t in 1:(n.occasions-1)){
@@ -285,7 +288,7 @@ model {
         p.juv[t,j] <- 0
       }
       for (j in (t+1):(n.occasions-1)){
-        logit(p.juv[t,j])  <- mu.p.juv[goodyear[j]] + agebeta*(j - t) + eps.p[j]
+        logit(p.juv[t,j])  <- mu.p.juv + beta.p.eff*goodyear[j] + agebeta*(j - t) + eps.p[j]   #### CAT HORSWILL SUGGESTED TO HAVE A CONTINUOUS EFFORT CORRECTION
       }
     }
     
@@ -309,7 +312,7 @@ model {
       logit(phi.juv[j]) <- mu.juv + eps.phi[j]*juv.poss[j]
       logit(phi.ad[j]) <- mu.ad + eps.phi[j]
       eps.phi[j] ~ dnorm(0, tau.phi) 
-      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]    #### CAT HORSWILL SUGGESTED TO HAVE A CONTINUOUS EFFORT CORRECTION: mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j]
+      logit(p.ad[j])  <- mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j]    #### CAT HORSWILL SUGGESTED TO HAVE A CONTINUOUS EFFORT CORRECTION: mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j]
       eps.p[j] ~ dnorm(0, tau.p)
     }
     
@@ -371,7 +374,7 @@ model {
     
     ## define recruit probability for various ages ##
     for (age in 1:30) {
-    logit(p.juv.recruit[age,tt])<-mu.p.juv[2] + eps.p[tt+24] + (agebeta * age)
+    logit(p.juv.recruit[age,tt])<-mu.p.juv + eps.p[tt+24] + (agebeta * age) + beta.p.eff*0.5  ### replaced categorical intercept with good year effort correction
     }
     
     
@@ -504,13 +507,15 @@ model {
     
     ## recruit probability
     for (age in 1:30) {
-      logit(p.juv.recruit.f[age])<-mu.p.juv[2] + (agebeta * age)
+      logit(p.juv.recruit.f[age])<-mu.p.juv + (agebeta * age) + beta.p.eff*0.5  ### replaced categorical intercept with good year effort correction
     }
 
 
   # -------------------------------------------------        
   # 4.1. System process for future
   # -------------------------------------------------
+  ## SPECIFY RETURN PROBABILITY FOR ADULTS
+  logit(return.prob.ad)  <- mu.p.ad + beta.p.eff*0.5 ### specify return probability as high obs effort year 
         
   ## LOOP OVER EACH SCENARIO  
   for(scen in 1:n.scenarios){
@@ -535,7 +540,7 @@ model {
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
     
     N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))              ### previous year's adults that survive
-    N.breed.ready.f[scen,1] ~ dbin(mean.p.ad[2], round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
+    N.breed.ready.f[scen,1] ~ dbin(return.prob.ad, round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
     Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])            ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])               ### potential breeders that remain at sea
     N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because they bred successfully
@@ -575,7 +580,7 @@ model {
       ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.prev.succ.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round(N.succ.breed.f[scen,tt-1]))                  ### these birds will  remain at sea because tey bred successfully
-      N.breed.ready.f[scen,tt] ~ dbin(min(0.99,(mean.p.ad[2]/(1-mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of survivors that returns, with fecundity partialled out of return probability
+      N.breed.ready.f[scen,tt] ~ dbin(min(0.99,(return.prob.ad/(1-mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of survivors that returns, with fecundity partialled out of return probability
       Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
       N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because tey bred successfully
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt]+N.prev.succ.f[scen,tt])                     ### potential breeders that remain at sea    
@@ -616,8 +621,8 @@ jags.data <- list(marr.j = chick.marray,
                   n.occasions = dim(chick.marray)[2],
                   r.j=apply(chick.marray,1,sum),
                   r.a=apply(adult.marray,1,sum),
-                  goodyear=goodyears$p.sel,
-                  #goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
+                  #goodyear=goodyears$p.sel,
+                  goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
                   juv.poss=phi.juv.possible$JuvSurv, ### sets the annual survival of juveniles to the mean if <70 were ringed
                   
                   ### count data
@@ -644,8 +649,8 @@ jags.data <- list(marr.j = chick.marray,
 # Initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          mean.phi.juv = runif(1, 0.5, 0.9),
-                         mean.p.ad = runif(2, 0.2, 1),
-                         mean.p.juv = runif(2, 0, 1),
+                         mean.p.ad = runif(1, 0.2, 1),   ### reduced from 2 to 1 with continuous effort
+                         mean.p.juv = runif(1, 0, 1),    ### reduced from 2 to 1 with continuous effort
                          Ntot.breed= c(runif(1, 4950, 5050),rep(NA,n.years-1)),
                          JUV= c(rnorm(1, 246, 0.1),rep(NA,n.years-1)),
                          N.atsea= c(rnorm(1, 530, 0.1),rep(NA,n.years-1)),
@@ -667,20 +672,20 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
                 "mean.p.sd","sigma.p","sigma.phi")
 
-# MCMC settings
-ni <- 12500
-nt <- 10
-nb <- 25000
-nc <- 3
-
-
-
-# RUN THE MODEL {took 3 hours for niter=125000)
-## _logscale model requires log(R) as input for count data
-## THIS DOES NOT CONVERGE
+# # MCMC settings
+# ni <- 125
+# nt <- 10
+# nb <- 25
+# nc <- 3
+# 
+# 
+# 
+# # RUN THE MODEL {took 3 hours for niter=125000)
+# ## _logscale model requires log(R) as input for count data
+# ## THIS DOES NOT CONVERGE - USED ONLY FOR ERROR SHOOTING
 # TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
 #                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-#                     Rhat.limit=1.2, max.iter=200000)  
+#                     Rhat.limit=1.2, max.iter=200)
 
 nt <- 10
 nb <- 25000
