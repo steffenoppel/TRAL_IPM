@@ -9,6 +9,7 @@
 ## 2. does average age of all TRAL breeders in a given year change over time?
 ## 3. does average age of all TRAL individuals contacted in a given year change over time? - not used in manuscript as age increases due to length of time since ringing was started
 
+## update on 2 Oct 2021: after chat with Cat Horswill try to examine whether mean age at first breeding 2004-2009 is higher than 2015-2021
 
 library(tidyverse)
 library(lubridate)
@@ -411,8 +412,42 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig3.jpg", width=9, height=
 
 
 
+
+
+
+#############################################################################
+##   QUESTION 3: does age of first breeding change over time? ###############
+#############################################################################
+unique(contacts$Breeding_StatusID)
+firstbreedyear<-contacts %>%
+  filter(FIRST_AGE %in% c("Chick","Fledgling")) %>%
+  filter(!(FIRST_YEAR==Contact_Year)) %>%
+  filter(Breeding_StatusID %in% c(1,1899636611,1899636612,1899636615,1899636613,105568723,1899636616,-1525788936)) %>%
+  filter(!(is.na(Nest_Description))) %>%
+  group_by(BirdID,FIRST_YEAR) %>%
+  summarise(FirstBreed=min(Contact_Year),AgeFirstBreed=min(ContAge))
+dim(firstbreedyear)
+
+### exploratory plots
+ggplot(firstbreedyear) +
+  geom_point(aes(x=FirstBreed, y=AgeFirstBreed), position=position_jitter()) +
+  geom_smooth(aes(x=FirstBreed, y=AgeFirstBreed),method="lm")
+
+
+### decadal analysis
+firstbreedyear %>%
+  mutate(decade=if_else(FirstBreed<2000,"1990s",if_else(FirstBreed<2015,"2000-2015","2015-2021"))) %>%
+  group_by(decade) %>%
+  summarise(med=median(AgeFirstBreed),lcl=quantile(AgeFirstBreed,0.05),ucl=quantile(AgeFirstBreed,0.95))
+
+
+
+
+
+
+
 #################################################################################################################
-##   QUESTION 3: does age of all recorded bird change over time? ABANDONED BECAUSE NOT MEANINGFUL ###############
+##   QUESTION 4: does age of all recorded bird change over time? ABANDONED BECAUSE NOT MEANINGFUL ###############
 #################################################################################################################
 head(contacts)
 dim(contacts)
