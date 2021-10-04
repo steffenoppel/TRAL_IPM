@@ -14,6 +14,8 @@
 
 # updated 9 August 2021 to include final output in different form
 
+# updated 4 Oct 2021 to include Figure S2 (showing no difference in effort formulation)
+
 
 library(tidyverse)
 library(jagsUI)
@@ -256,6 +258,94 @@ ggplot(bsout) +
         legend.text=element_text(size=14),
         legend.title = element_text(size=16),
         legend.position=c(0.26,0.9),
+        #panel.grid.major = element_blank(), 
+        #panel.border = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS3.jpg", width=14, height=8)
+
+
+
+
+
+
+
+
+#########################################################################
+# PRODUCE SUPPLEMENTARY FIGURE COMPARING CONT EFFORT AND TWO-INTERCEPT MODEL
+#########################################################################
+
+### load the model output from constant effort predictions
+load("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\oldTRAL_IPM\\TRAL_IPM_output_FINAL_conteffort.RData")
+
+
+## write output into file ##
+exportconteff<-predictions %>%
+  mutate(Year=c(
+    rep(NA,8),         ## for mean phi, p, and growth rates
+    seq(2004,2021,1),   ## for N.tot
+    rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
+    #seq(2004,2020,1), ##  for lambda 
+    rep(seq(1979,2020,1), 2), ##  for phi.ad and phi.juv
+    seq(2004,2021,1)   ## for ann.fec
+  )) %>%     ## for deviance and agebeta
+  mutate(demographic=parameter) %>%
+  mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
+  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
+  mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
+  mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
+  mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
+  arrange(demographic,Year)
+
+TABLE1coneff<-exportconteff %>% 
+  filter(!grepl("Ntot",parameter)) %>%
+  filter(parameter %in% c("fut.growth.rate[1]",
+                          "fut.growth.rate[2]",
+                          "fut.growth.rate[3]",
+                          "mean.fec",
+                          "pop.growth.rate",
+                          "mean.phi.ad",
+                          "mean.phi.juv" )) %>%
+  mutate(Model="continuous observation effort") 
+
+
+FIGS2DATA<-TABLE1 %>%
+  mutate(Model="categorical observation effort") %>%
+  rename(lcl=Lower95, ucl=Upper95) %>%
+  bind_rows(TABLE1coneff) %>%
+  select(Model, parameter,Median, lcl,ucl) %>%
+  mutate(plotorder=rep(c(3,4,5,6,7,1,2),2)) %>%
+  mutate(plotorder=if_else(Model=="categorical observation effort",plotorder-0.2, plotorder+0.2)) %>%
+  arrange(plotorder) %>%
+  mutate(parameter=rep(c("adult survival",
+                         "juvenile survival",
+                         "breeding success",
+                         "pop.growth (past)",
+                         "pop.growth (future) - no change",
+                         "pop.growth (future) - eradication",
+                         "pop.growth (future) - worse mice"),each=2))
+
+## CREATE PLOT FOR COMPARISON OF PARAMETER ESTIMATES
+ggplot(FIGS2DATA) + 
+  geom_point(aes(y=Median, x=plotorder, colour=Model), size=1)+   #
+  geom_errorbar(aes(ymin=lcl, ymax=ucl, x=plotorder, colour=Model), width=0.1)+   #
+  ylab("\nParameter estimate\n") +
+  xlab("Integrated population model parameter") +
+  scale_y_continuous(breaks=seq(0.2,1.1,0.1), limits=c(0.2,1.1))+
+  scale_x_continuous(breaks=seq(1,7,1), limits=c(0,8), labels=FIGS2DATA$parameter[seq(1,13,2)])+
+  
+  ### add the bird icons
+  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text.y=element_text(size=18, color="black"), 
+        axis.text.x=element_text(size=14, color="black", angle=45,hjust = 1),        
+        axis.title=element_text(size=20),
+        legend.text=element_text(size=14),
+        legend.title=element_text(size=16),
+        legend.key=element_blank(),
+        #legend.box.background =  = element_blank(),
+        legend.position=c(0.80,0.20),
         #panel.grid.major = element_blank(), 
         #panel.border = element_blank(),
         panel.grid.minor = element_blank())
