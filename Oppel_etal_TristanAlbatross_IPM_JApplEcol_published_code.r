@@ -17,123 +17,64 @@ select<-dplyr::select
 
 
 #########################################################################
-# LOAD PRE-PREPARED DATA ON COUNTS AND BREEDING SUCCESS
+# LOAD ALL PREPARED DATA
 #########################################################################
+setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+load("Oppel_etal_TristanAlbatross_IPM_Input.RData")
+
+
+file_url <- "https://github.com/steffenoppel/TRAL_IPM/blob/main/Oppel_etal_TristanAlbatross_IPM_Input.RData?raw=true"
+load(url(file_url))
 load(url("https://github.com/steffenoppel/TRAL_IPM/blob/main/Oppel_etal_TristanAlbatross_IPM_Input.RData")) ## if this does not work, try the workaround: https://stackoverflow.com/questions/56602149/directly-loading-rdata-from-github
 
-## BOTH ARRAYS MUST HAVE EXACT SAME DIMENSIONS
-dim(chick.marray)
-dim(adult.marray)
-
-
-### COUNT DATA FOR POPULATION TREND ######
-TRAL.pop<-POPSIZE
-head(TRAL.pop)
-names(TRAL.pop)
-TRAL.pop[14,4]<-136   ### number of nests monitored in Gonydale that year
-
-## COMBINE SITES THAT WERE AMBIGUOUSLY DEFINED OVER TIME 
-TRAL.pop<-TRAL.pop %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2003) %>%   ### changed from 2003
-  mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
-  mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
-  group_by(Year,Site) %>%
-  summarise(Count=sum(Count, na.rm=T)) %>%
-  mutate(Count=ifelse(Count==0,NA,Count)) %>%
-  spread(key=Site, value=Count)
-
-## to account for data gaps, need to quantify what proportion of the population was counted
-
-TRAL.props<-prop.table(as.matrix(TRAL.pop[,2:9]),1)
-mean.props<-apply(TRAL.props[c(1,3:7,9:13,15:17),],2,mean) ## for start in 2004
-
-TRAL.pop$prop.counted<-0
-for (l in 1:length(TRAL.pop$Year)){
-  TRAL.pop$prop.counted[l]<-sum(mean.props[which(!is.na(TRAL.pop[l,2:9]))])
-}
-
-
-## CALCULATE SUM PER YEAR 
-TRAL.pop$tot<-rowSums(TRAL.pop[,2:9], na.rm=T)
-R<- as.matrix(TRAL.pop[,2:9])
-n.years<-nrow(R)
-n.sites<-ncol(R)
-
-
-#### BREEDING SUCCESS DATA FOR FECUNDITY ######
-TRAL.chick<-CHICKCOUNT
-TRAL.bs<-FECUND
-TRAL.chick[TRAL.chick$Year==2013,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2013,4]*TRAL.bs$BREED_SUCC[TRAL.bs$Year==2013])
-TRAL.chick[TRAL.chick$Year==2014,4]<-as.integer(TRAL.pop[TRAL.pop$Year==2014,4]*TRAL.bs$BREED_SUCC[TRAL.bs$Year==2014])
-
-TRAL.chick<-TRAL.chick %>% gather(key='Site', value='Count',-Year) %>%
-  filter(Year>2003) %>%  ### changed from 2003
-  mutate(Site=if_else(Site %in% c('GP Valley','West Point'),'GP Valley',as.character(Site))) %>%
-  mutate(Site=if_else(Site %in% c('Gonydale','Green Hill','Hummocks'),'Gonydale',as.character(Site))) %>%
-  group_by(Year,Site) %>%
-  summarise(Count=sum(Count, na.rm=T)) %>%
-  mutate(Count=ifelse(Count==0,NA,Count)) %>%
-  spread(key=Site, value=Count)
-
-### NOTE THAT USE OF 'if_else' switches Gonydale and GP_Valley columns around [only happens in R4.0.2!!]
-TRAL.chick[4,4]<-CHICKCOUNT[11,4] ### in 2011 no adults were counted in Green hill and Hummocks, so we cannot add up the chicks across those 3 sites
-
-
-TRAL.chick$tot<-rowSums(TRAL.chick[,2:9], na.rm=T)
-#TRAL.chick$tot[c(3,13,19)]<-NA   ## when start in 2001
-TRAL.chick$tot[10]<-NA   ## when start in 2004
-#TRAL.chick$tot[6]<-NA   ## when start in 2008
-
-J<- as.matrix(TRAL.chick[,2:9])
-
-### specify constants for JAGS
-n.years<-dim(R)[1]		## defines the number of years
-n.sites<-dim(R)[2]    ## defines the number of study areas
-
-
-### UPDATE 10 January 2021 - reduce R and J to vectors of sum across the study areas for which we have data
-
-Jlong<-TRAL.chick %>% gather(key='Site', value="chicks",-Year)
-PROD.DAT<-TRAL.pop %>% select(-prop.counted,-tot) %>% gather(key='Site', value="adults",-Year) %>%
-  left_join(Jlong, by=c("Year","Site")) %>%
-  mutate(include=ifelse(is.na(adults+chicks),0,1)) %>%
-  filter(include==1) %>%
-  group_by(Year) %>%
-  summarise(J=sum(chicks),R=sum(adults))
-
-
-
-
-
-### DIMENSION MISMATCH IN DATA
-# IPM runs from 2004-2021 # changed on 7 February - and again on 4 June 2021
-# survival analysis runs from 1979-2021, but recapture index refers to columns, which represent year 1980-2021 plus the ones never recaptured (last column)
-# very difficult
-names(TRAL_CHICK)
-TRAL.pop$Year
-
-OFFSET<-min(which(!is.na(match(as.numeric(names(TRAL_CHICK)[2:44]),TRAL.pop$Year))))
-names(TRAL_CHICK)[OFFSET+1]
-TRAL.pop$Year[1]
-
+rm(list=setdiff(ls(), c("chick.marray",
+                        "adult.marray",
+                        "goodyears",
+                        "phi.juv.possible",
+                        "n.sites",
+                        "n.years",
+                        "mean.props",
+                        "R",
+                        "PROD.DAT",
+                        "fut.surv.change")))
 
 
 #########################################################################
-# SPECIFY FUTURE DECREASE IN SURVIVAL
+# PREPARE DATA FOR MODEL
 #########################################################################
 
-dec.surv=0.9  ## we assume that adult survival will decrease by 10%
-lag.time=10    ## the decrease will take 10 years to materialise
-PROJECTION.years<-seq(1,30,1)  ## we specify the relative survival decrease for all 30 years in the projection
+# Bundle data
+jags.data <- list(marr.j = chick.marray,
+                  marr.a = adult.marray,
+                  n.occasions = dim(chick.marray)[2],
+                  r.j=apply(chick.marray,1,sum),
+                  r.a=apply(adult.marray,1,sum),
+                  goodyear=goodyears$p.sel,
+                  #goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
+                  juv.poss=phi.juv.possible$JuvSurv, ### sets the annual survival of juveniles to the mean if <70 were ringed
+                  
+                  ### count data
+                  n.sites=n.sites,
+                  T = n.years,
+                  prop.sites=mean.props,
+                  y.count=R,
+                  
+                  ### breeding success data
+                  J=PROD.DAT$J,
+                  R=PROD.DAT$R,
+                  
+                  ### longline effort data
+                  #longline=longlineICCAT,
+                  
+                  # ### FUTURE PROJECTION
+                  FUT.YEAR=30,  ### for different scenarios future starts at 1
+                  n.scenarios=3,
+                  fut.surv.change=as.matrix(fut.surv.change[,2:4]),  ## future survival rate change - matrix that adjusts gradual decrease in survival
+                  fut.fec.change=c(1,2,1)     ## future fecundity change - vector with one element for each scenario
+)
 
-fut.surv.change<- expand.grid(PROJECTION.years,dec.surv,lag.time) %>%
-  rename(Year=Var1,SURV3=Var2,LAG=Var3) %>%
-  mutate(ann.offset=(SURV3-1)/LAG) %>%
-  mutate(SURV3=ifelse(Year<LAG,1+(Year*ann.offset),SURV3)) %>%
-  mutate(SURV1=1,SURV2=1) %>%
-  select(Year, SURV1,SURV2,SURV3)
-  
-save.image("")
+
+
 
 
 #########################################################################
@@ -531,39 +472,7 @@ sink()
 
 
 
-#########################################################################
-# PREPARE DATA FOR MODEL
-#########################################################################
 
-# Bundle data
-jags.data <- list(marr.j = chick.marray,
-                  marr.a = adult.marray,
-                  n.occasions = dim(chick.marray)[2],
-                  r.j=apply(chick.marray,1,sum),
-                  r.a=apply(adult.marray,1,sum),
-                  goodyear=goodyears$p.sel,
-                  #goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
-                  juv.poss=phi.juv.possible$JuvSurv, ### sets the annual survival of juveniles to the mean if <70 were ringed
-                  
-                  ### count data
-                  n.sites=n.sites,
-                  T = n.years,
-                  prop.sites=mean.props,
-                  y.count=R,    ### use log(R) here if using the logscale model
-                  
-                  ### breeding success data
-                  J=PROD.DAT$J,
-                  R=PROD.DAT$R,
-                  
-                  ### longline effort data
-                  #longline=longlineICCAT,
-                  
-                  # ### FUTURE PROJECTION
-                  FUT.YEAR=30,  ### for different scenarios future starts at 1
-                  n.scenarios=3,
-                  fut.surv.change=as.matrix(fut.surv.change[,2:4]),  ## future survival rate change - matrix that adjusts gradual decrease in survival
-                  fut.fec.change=c(1,2,1)     ## future fecundity change - vector with one element for each scenario
-                  )
 
 
 # Initial values 
@@ -593,20 +502,14 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "mean.p.sd","sigma.p","sigma.phi")
 
 # MCMC settings
-ni <- 12500
+ni <- 125000
 nt <- 10
 nb <- 25000
 nc <- 3
 
 
 
-# RUN THE MODEL {took 3 hours for niter=125000)
-## _logscale model requires log(R) as input for count data
-## THIS DOES NOT CONVERGE
-# TRALipm <- autojags(jags.data, inits, parameters, "C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
-#                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
-#                     Rhat.limit=1.2, max.iter=200000)  
-
+# RUN THE MODEL {took 3 days for niter=125000)
 nt <- 10
 nb <- 25000
 nad <- 2000
