@@ -19,38 +19,38 @@ select<-dplyr::select
 #########################################################################
 # LOAD ALL PREPARED DATA
 #########################################################################
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-load("Oppel_etal_TristanAlbatross_IPM_Input.RData")
-
-
+#setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+#load("Oppel_etal_TristanAlbatross_IPM_Input.RData")
 file_url <- "https://github.com/steffenoppel/TRAL_IPM/blob/main/Oppel_etal_TristanAlbatross_IPM_Input.RData?raw=true"
 load(url(file_url))
-load(url("https://github.com/steffenoppel/TRAL_IPM/blob/main/Oppel_etal_TristanAlbatross_IPM_Input.RData")) ## if this does not work, try the workaround: https://stackoverflow.com/questions/56602149/directly-loading-rdata-from-github
+ls()
 
-rm(list=setdiff(ls(), c("chick.marray",
-                        "adult.marray",
-                        "goodyears",
-                        "phi.juv.possible",
-                        "n.sites",
-                        "n.years",
-                        "mean.props",
-                        "R",
-                        "PROD.DAT",
-                        "fut.surv.change")))
+## Description of data:
+# R: matrix with count data of Tristan Albatross pairs from 2004-2021 (rows)in 8 study areas (columns) from 2004-2021 (rows)
+# PROD.DAT: dataframe with breeding success data of Tristan Albatross from 2004-2021, where column R denotes the total number of breeding pairs, and J the total number of fledglings
+# n.sites: vector of length 1 that specifies the number of study areas in matrix R (8)
+# n.years: vector of length 1 that specifies the number of years in matrix R (18)
+# adult.marray: m-array matrix for adult mark recapture data with 42 rows and 43 columns specifying the number of adult birds 'released' in occasion[row] that were next observed in occasion[column]. Last column indicates adults never seen again
+# chick.marray: m-array matrix for chick mark recapture data with 42 rows and 43 columns specifying the number of chicks ringed in occasion[row] that were first observed in occasion[column]. Last column indicates chicks never seen again
+# fut.surv.change: dataframe that specifies the annual survival change multiplier for all future 30 years (rows) under 3 scenarios (columns)
+# goodyears: dataframe that specifies the annual observation effort as the proportion of marked animals observed in that year, column 'p.sel' indicates the effort intercept for low effort (1) or high effort (2) years
+# mean.props: vector of length 8 specifying the mean proportion of the annual breeding population that is counted in each of the 8 study areas in matrix R - used to relate population process to count data
+# phi.juv.possible: dataframe that specifies the number of chicks ringed in each year (row) of the study, indicating whether it was possible to estimate juvenile survival (JuvSurv) for that year (=1) or not (=0, when N too low)
+
+
 
 
 #########################################################################
 # PREPARE DATA FOR MODEL
 #########################################################################
 
-# Bundle data
+# Create list with input data to pass to JAGS
 jags.data <- list(marr.j = chick.marray,
                   marr.a = adult.marray,
                   n.occasions = dim(chick.marray)[2],
                   r.j=apply(chick.marray,1,sum),
                   r.a=apply(adult.marray,1,sum),
                   goodyear=goodyears$p.sel,
-                  #goodyear=goodyears$prop.seen,   ### if using a continuous effort correction
                   juv.poss=phi.juv.possible$JuvSurv, ### sets the annual survival of juveniles to the mean if <70 were ringed
                   
                   ### count data
@@ -63,12 +63,9 @@ jags.data <- list(marr.j = chick.marray,
                   J=PROD.DAT$J,
                   R=PROD.DAT$R,
                   
-                  ### longline effort data
-                  #longline=longlineICCAT,
-                  
-                  # ### FUTURE PROJECTION
-                  FUT.YEAR=30,  ### for different scenarios future starts at 1
-                  n.scenarios=3,
+                  ### FUTURE PROJECTION
+                  FUT.YEAR=30, ## number of years for future projection
+                  n.scenarios=3, ## number of future scenarios explored
                   fut.surv.change=as.matrix(fut.surv.change[,2:4]),  ## future survival rate change - matrix that adjusts gradual decrease in survival
                   fut.fec.change=c(1,2,1)     ## future fecundity change - vector with one element for each scenario
 )
@@ -472,10 +469,11 @@ sink()
 
 
 
+#########################################################################
+# SET UP MODEL RUN
+#########################################################################
 
-
-
-# Initial values 
+# Specify initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          mean.phi.juv = runif(1, 0.5, 0.9),
                          mean.p.ad = runif(2, 0.2, 1),
@@ -483,39 +481,23 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          Ntot.breed= c(runif(1, 4950, 5050),rep(NA,n.years-1)),
                          JUV= c(rnorm(1, 246, 0.1),rep(NA,n.years-1)),
                          N.atsea= c(rnorm(1, 530, 0.1),rep(NA,n.years-1)),
-                         # IM[,1,1]= c(rnorm(1, 324, 0.1),rep(NA,n.years-1)),
-                         # IM[,2,1]= c(rnorm(1, 257, 0.1),rep(NA,n.years-1)),
-                         # IM[,3,1]= c(rnorm(1, 462, 0.1),rep(NA,n.years-1)),
-                         # IM[,4,1]= c(rnorm(1, 207, 0.1),rep(NA,n.years-1)),
-                         # IM[,5,1]= c(rnorm(1, 700, 0.1),rep(NA,n.years-1)),
-                         # IM[,6,1]= c(runif(1, 150, 300),rep(NA,n.years-1)),
                          sigma.obs=matrix(runif(n.sites*n.years,1,20),ncol=n.years))}
 
- 
-
-# Parameters monitored
+# Select the parameters monitored
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "mean.recruit","pop.growth.rate","fut.growth.rate",
-                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
-                #new
+                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",
                 "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
                 "mean.p.sd","sigma.p","sigma.phi")
 
 # MCMC settings
-ni <- 125000
-nt <- 10
-nb <- 25000
-nc <- 3
-
-
-
-# RUN THE MODEL {took 3 days for niter=125000)
 nt <- 10
 nb <- 25000
 nad <- 2000
 nc <- 3
 ns <- 200000 #longest
 
+# RUN THE MODEL (took 3 days for ns=200000)
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
                     model="C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_marray_age_recruit_immat_FINAL.jags",
                     n.chains = nc, thin = nt, burnin = nb, adapt = nad,sample = ns, 
@@ -523,89 +505,28 @@ TRALipm <- run.jags(data=jags.data, inits=inits, parameters,
 
 
 
-#########################################################################
-# SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
-#########################################################################
-### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
 
-## updated script for 'runjags' output
+
+
+
+#########################################################################
+# CREATE TABLES AND FIGURES FROM OUTPUT
+#########################################################################
+
+## extract summary table from raw run.jags output
 summary_tralipm <- summary(TRALipm)
 summary_tralipm_df <- as.data.frame(summary_tralipm)
-View(summary_tralipm_df)
-head(summary_tralipm_df)
-min(summary_tralipm_df$SSeff) #Ntot[1]
-max(summary_tralipm_df$psrf) #Ntot[1]
-
 addsummary_tralipm <- add.summary(TRALipm,plots = runjags.getOption("predraw.plots"))
-addsummary_tralipm #18 min
-
-plot(addsummary_tralipm, layout=c(2,2))
-
 predictions <- data.frame(summary(addsummary_tralipm),
                           parameter = row.names(summary(addsummary_tralipm)))
-head(predictions)
 row.names(predictions) <- 1:nrow(predictions)
-
 predictions <- predictions[1:218,]   ### 200 cuts off ann.fec
-#predictions[1:5,]
-
 predictions$Mode <- NULL
 np <- names(predictions) 
 names(predictions) <- c("lcl",np[2],"ucl",np[4:9],"Rhat",np[11])
-
 max(predictions$Rhat)
 
-
-
-##########################################################################
-#
-# TRISTAN ALBATROSS INTEGRATED POPULATION MODEL 2001-2018
-#
-##########################################################################
-# based on output created in TRAL_IPM_v3.r
-# includes JAGS output from 4 scenarios of AYNA population trajectory
-
-# changed on 3 April 2020 to adjust for reduced parameters monitored
-# changed on 22 April to incorporate 3 scenarios
-
-# updated 15 January 2021 to include new output from m-array
-# split into new file on 21 January 2021 to include new output for total population size
-
-# updated 9 August 2021 to include final output in different form
-
-# updated 4 Oct 2021 to include Figure S2 (showing no difference in effort formulation)
-
-
-library(tidyverse)
-library(jagsUI)
-library(data.table)
-library(runjags)
-#library(nimble)
-filter<-dplyr::filter
-select<-dplyr::select
-library(grid)
-library(magick)
-
-
-#########################################################################
-# LOAD MODEL OUTPUT FROM IPMs
-#########################################################################
-
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-#load("TRAL_IPM_output_2020.RData")
-#load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
-load("TRAL_IPM_output_FINAL.RData")
-imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
-TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
-
-
-
-#########################################################################
-# PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
-#########################################################################
-### predictions created in TRAL_IPM_FINAL.r
-
-## write output into file ##
+## convert predictions into export table in legible format with years rather than indices
 export<-predictions %>%
   mutate(Year=c(
     rep(NA,8),         ## for mean phi, p, and growth rates
@@ -623,104 +544,47 @@ export<-predictions %>%
   mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
   rename(Rhat=psrf) %>%
   arrange(demographic,Year)
-tail(export)
-hist(export$Rhat)
-hist(export$SSeff)
-
-#write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names=F)
 
 
-
-
-#########################################################################
-# SUMMARIES FOR TEXT
-#########################################################################
-## NEED TO DO: base these regressions on IPM estimates
-
-### change in breeding pop size
-PROD.DAT$R[PROD.DAT$R<1000]<-NA
-summary(lm(R~Year,data=PROD.DAT))
-range(PROD.DAT$R, na.rm=T)
-
-##change in breeding success
-PROD.DAT$J[is.na(PROD.DAT$R)]<-NA
-PROD.DAT$success<-PROD.DAT$J/PROD.DAT$R
-#summary(lm(success~Year,data=PROD.DAT))
-bsout<-export %>% filter(demographic=="fecundity") %>% filter(!is.na(Year)) %>%
-  select(Year,Median,Lower95,Upper95)
-summary(lm(Median~Year,data=bsout))
-range(bsout$Median, na.rm=T)
-
-
-#########################################################################
-# PRODUCE TABLE 1 THAT SUMMARISES DEMOGRAPHIC RATES
-#########################################################################
-
+## PRODUCE TABLE 1 THAT SUMMARISES DEMOGRAPHIC RATES
 TABLE1<-export %>% 
   filter(!grepl("Ntot",parameter)) %>%
   filter(parameter %in% c("fut.growth.rate[1]",
                           "fut.growth.rate[2]",
                           "fut.growth.rate[3]",
                           "mean.fec",
-                          #"mean.propensity",
-                          #"mean.recruit",
                           "pop.growth.rate",
                           "mean.phi.ad",
                           "mean.phi.juv" )) 
 
-#write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
 
+## PRODUCE FIGURE 1 THAT SHOWS POPULATION TRAJECTORY
 
-
-
-
-#########################################################################
-# PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR POPULATION TREND
-#########################################################################
-## INCLUDED DIFFERENT SCENARIOS ON 22 APRIL 2020
 ## scenario 1: projection with no changes in demography
 ## scenario 2: successful mouse eradication in 2021 - fecundity doubles
 ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
-
-
-## PREPARE PLOTTING DATAFRAME
-plot1_df <- export %>%
+export %>%
   rename(lcl=Lower95,ucl=Upper95) %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
   arrange(Year) %>%
   mutate(Scenario="past, and no future change") %>%
   mutate(Scenario=if_else(grepl("f\\[2",parameter,perl=T,ignore.case = T), "after successful mouse eradication",if_else(grepl("f\\[3",parameter,perl=T,ignore.case = T),"unsuccessful mouse eradication and worsening impacts",Scenario))) %>%
   mutate(ucl=if_else(ucl>15000,15000,ucl)) %>%
-  filter(!(Median<500 & Year<2020)) #%>%
-#mutate(Median=ifelse(Year>2021 & Scenario=="status quo",NA,Median)) %>%
+  filter(!(Median<500 & Year<2020)) %>%
 
-
-## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-TRAL.pop$line="observed trend"
-ggplot(plot1_df) + 
+  ggplot() + 
   geom_line(aes(y=Median*2, x=Year, colour=Scenario), size=1)+   #
   geom_ribbon(aes(x=Year, ymin=lcl*2,ymax=ucl*2, fill=Scenario),alpha=0.3)+ #
-  #scale_color_manual(values=c('#4393c3','#d6604d','#b2182b')) +
-  #scale_fill_manual(values=c('#4393c3','#d6604d','#b2182b')) +
+
   scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
   scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
   
-  ## add the breeding pair count data
-  geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),col="black", size=2.5)+
-  geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
-  #ylab() +
-  #xlab("Year") +
   scale_y_continuous(breaks=seq(0,18000,2000), limits=c(0,20000),expand = c(0, 0))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
-  #scale_linetype_manual(name="Breeding population",label="observed trend") +
   labs(x="Year", y="\nTristan Albatross Population Size (Individuals)\n",
        col="Total population scenario",
-       fill="Total population scenario",
-       linetype="Breeding population") +
-  
-  ### add the bird icons
-  annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
+       fill="Total population scenario") +
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
@@ -729,188 +593,7 @@ ggplot(plot1_df) +
         legend.title = element_text(size=16),
         legend.position=c(0.26,0.82),
         panel.grid.major = element_line(size=.1, color="grey94"),
-        #panel.grid.major.y = element_line(size=.1, color="grey37"), 
-        #panel.grid.major.x = element_blank(), 
-        #panel.border = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(fill=NA, colour = "black"))
-
-ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig1.jpg", width=14, height=8)
-
-
-
-
-#########################################################################
-# CALCULATE BENEFIT OF ERADICATION
-#########################################################################
-
-### MAXIMUM BENEFIT ###
-plot1_df %>% filter(Year==2050) %>% 
-  mutate(benefit=max(Median)/min(Median),
-         benefit.lcl=max(lcl)/min(lcl),
-         benefit.ucl=max(ucl)/min(ucl))
-
-### MINIMUM BENEFIT ###
-plot1_df %>% filter(Year==2050) %>% 
-  mutate(benefit=max(Median)/median(Median),
-         benefit.lcl=max(lcl)/median(lcl),
-         benefit.ucl=max(ucl)/median(ucl))
-
-### BENEFIT EVEN WITH FAILURE ###
-plot1_df %>% filter(Year==2050) %>% 
-  mutate(benefit=median(Median)/min(Median),
-         benefit.lcl=median(lcl)/min(lcl),
-         benefit.ucl=median(ucl)/min(ucl))
-
-
-
-## ALTERNATIVE PLOT WITH TWO SEPARATE AXES
-# 
-# ggplot(plot1_df) + 
-#   geom_line(aes(y=Median*2, x=Year, colour=factor(Scenario)), size=1) +   #
-#   geom_ribbon(aes(x=Year, ymin=lcl*2,ymax=ucl*2, fill=Scenario),alpha=0.3)+ #
-#   geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*5, x=Year),col="firebrick", size=2.5)+
-#   geom_point(data=TRAL.pop[TRAL.pop$Year %in% c(2001,2011),],aes(y=tot*5, x=Year),col="salmon", size=2)+
-#   ylab("\nGlobal Tristan Albatross Population (Individuals)") +
-#   xlab("Year") +
-#   labs(color = "Scenario", fill = "Scenario")+
-#   scale_y_continuous(breaks=seq(0,27000,2000), limits=c(0,27000),
-#                      sec.axis = sec_axis(~ . / 5, 
-#                                          name = "Number of Breeding Pairs on Gough\n"))+
-#   scale_x_continuous(breaks=seq(2001,2050,5))+
-#   theme_bw()+
-#   theme( 
-#     axis.text=element_text(size=16, color="black"), 
-#     axis.title=element_text(size=18),
-#     legend.text=element_text(size=14),
-#     legend.title = element_text(size=16),
-#     legend.position=c(0.1,0.9),
-#     #panel.grid.major = element_blank(), 
-#     panel.grid.minor = element_blank()#, 
-#     #panel.border = element_blank()
-#   )
-
-
-
-#########################################################################
-# PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR PRODUCTIVITY
-#########################################################################
-bsout<-bsout %>% filter(Year<2021)
-
-## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-ggplot(bsout) + 
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   #
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-  geom_smooth(aes(y=Median, x=Year),method="lm",se=T,col="grey12", size=1)+
-  ylab("\nBreeding success of Tristan Albatross\n") +
-  xlab("Year") +
-  scale_y_continuous(breaks=seq(0,0.8,0.2), limits=c(0,0.8))+
-  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2020))+
-  
-  ### add the bird icons
-  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
-        axis.title=element_text(size=20),
-        legend.text=element_text(size=14),
-        legend.title = element_text(size=16),
-        legend.position=c(0.26,0.9),
-        #panel.grid.major = element_blank(), 
-        #panel.border = element_blank(),
-        panel.grid.minor = element_blank())
-
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS3.jpg", width=14, height=8)
-
-
-
-
-
-
-
-
-#########################################################################
-# PRODUCE SUPPLEMENTARY FIGURE COMPARING CONT EFFORT AND TWO-INTERCEPT MODEL
-#########################################################################
-
-### load the model output from constant effort predictions
-load("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\oldTRAL_IPM\\TRAL_IPM_output_FINAL_conteffort.RData")
-
-
-## write output into file ##
-exportconteff<-predictions %>%
-  mutate(Year=c(
-    rep(NA,8),         ## for mean phi, p, and growth rates
-    seq(2004,2021,1),   ## for N.tot
-    rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
-    #seq(2004,2020,1), ##  for lambda 
-    rep(seq(1979,2020,1), 2), ##  for phi.ad and phi.juv
-    seq(2004,2021,1)   ## for ann.fec
-  )) %>%     ## for deviance and agebeta
-  mutate(demographic=parameter) %>%
-  mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
-  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
-  mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
-  mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
-  mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
-  arrange(demographic,Year)
-
-TABLE1coneff<-exportconteff %>% 
-  filter(!grepl("Ntot",parameter)) %>%
-  filter(parameter %in% c("fut.growth.rate[1]",
-                          "fut.growth.rate[2]",
-                          "fut.growth.rate[3]",
-                          "mean.fec",
-                          "pop.growth.rate",
-                          "mean.phi.ad",
-                          "mean.phi.juv" )) %>%
-  mutate(Model="continuous observation effort") 
-
-
-FIGS2DATA<-TABLE1 %>%
-  mutate(Model="categorical observation effort") %>%
-  rename(lcl=Lower95, ucl=Upper95) %>%
-  bind_rows(TABLE1coneff) %>%
-  select(Model, parameter,Median, lcl,ucl) %>%
-  mutate(plotorder=rep(c(3,4,5,6,7,1,2),2)) %>%
-  mutate(plotorder=if_else(Model=="categorical observation effort",plotorder-0.2, plotorder+0.2)) %>%
-  arrange(plotorder) %>%
-  mutate(parameter=rep(c("adult survival",
-                         "juvenile survival",
-                         "breeding success",
-                         "pop.growth (past)",
-                         "pop.growth (future) - no change",
-                         "pop.growth (future) - eradication",
-                         "pop.growth (future) - worse mice"),each=2))
-
-## CREATE PLOT FOR COMPARISON OF PARAMETER ESTIMATES
-ggplot(FIGS2DATA) + 
-  geom_point(aes(y=Median, x=plotorder, colour=Model), size=1)+   #
-  geom_errorbar(aes(ymin=lcl, ymax=ucl, x=plotorder, colour=Model), width=0.1)+   #
-  ylab("\nParameter estimate\n") +
-  xlab("Integrated population model parameter") +
-  scale_y_continuous(breaks=seq(0.2,1.1,0.1), limits=c(0.2,1.1))+
-  scale_x_continuous(breaks=seq(1,7,1), limits=c(0,8), labels=FIGS2DATA$parameter[seq(1,13,2)])+
-  
-  ### add the bird icons
-  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text.y=element_text(size=18, color="black"), 
-        axis.text.x=element_text(size=14, color="black", angle=45,hjust = 1),        
-        axis.title=element_text(size=20),
-        legend.text=element_text(size=14),
-        legend.title=element_text(size=16),
-        legend.key=element_blank(),
-        #legend.box.background =  = element_blank(),
-        legend.position=c(0.80,0.20),
-        #panel.grid.major = element_blank(), 
-        #panel.border = element_blank(),
-        panel.grid.minor = element_blank())
-
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS2.jpg", width=14, height=8)
-
-
 
 
