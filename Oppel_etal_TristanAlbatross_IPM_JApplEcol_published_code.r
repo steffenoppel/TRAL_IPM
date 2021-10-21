@@ -84,24 +84,12 @@ cat("
 model {
     #-------------------------------------------------
     # integrated population model for the Gough TRAL population
-    # - age structured model with 10 age classes 
-    # - adult survival based on CMR ringing data
+    # - age structured model with 31 age classes 
+    # - adult and juvenile survival based on CMR ringing data
     # - pre breeding census, female-based assuming equal sex ratio & survival
-    # - productivity based on all areas incu and chick counts
-    # - simplified population process with assumed age at recruiting = 10 (Wanless et al. 2009)
-    # - adult breeders skipping when unsuccessful at rate of 22-32%, all successful breeders will skip
+    # - productivity based on all areas incubator and chick counts
+    # - adult breeders assumed to be detected perfectly and p in CJS model is taken as return and breed probability in population process model
     # - linked population process with SUM OF count data
-    # - v4 includes 3 scenarios of future projection: no change, improved fecundity, reduced adult survival
-    # - marray_v1 uses marray for survival estimation to speed up computation time
-    # - marray_simplified adjusts population process to make number of bird returning completely random
-    # - marray_simplified_v2 further simplifies return process to tie to recapture probability
-    # - marray_simplified_v3 includes carrying capacity for future projections and re-inserts breeding success
-    # - marray_simplified_v4 calculates Ntot and lambda based on Ntot (rather than just breeding pop).
-    # - marray_simplified_v5 includes two values for p (high and low monitoring effort years) and sets p.juv to 0 for first year.
-    # - marray_simplified_v5 also calculates mean propensity and recruitment from annual values for good monitoring years.
-    # - marray_age_recruit allows for varying juvenile recapture probability with age.
-    # - marray_age_recruit_immat creates a loop over immature age classes rather than specify each age separately
-    # - marray_age_recruit_immat_2008 sets juv surv to mean and starts in 2008 rather than 2004
     # -------------------------------------------------
     
 #-------------------------------------------------  
@@ -172,7 +160,7 @@ model {
       logit(phi.juv[j]) <- mu.juv + eps.phi[j]*juv.poss[j]
       logit(phi.ad[j]) <- mu.ad + eps.phi[j]
       eps.phi[j] ~ dnorm(0, tau.phi) 
-      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]    #### CAT HORSWILL SUGGESTED TO HAVE A CONTINUOUS EFFORT CORRECTION: mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j]
+      logit(p.ad[j])  <- mu.p.ad[goodyear[j]] + eps.p[j]    #### ALTERNATIVE CONTINUOUS EFFORT CORRECTION: mu.p.ad + beta.p.eff*goodyear[j] + eps.p[j] - made no difference
       eps.p[j] ~ dnorm(0, tau.p)
     }
     
@@ -187,42 +175,42 @@ model {
     # -------------------------------------------------
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
-    ## ADJUSTED BASED ON PAST POPULATION SIZES WIT CHICK COUNTS SINCE 1999
+    ## ADJUSTED BASED ON PAST POPULATION SIZES WITH CHICK COUNTS SINCE 1999
     
-    IM[1,1,1] ~ dnorm(324,20) T(0,)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003 - CAN BE MANIPULATED
+    IM[1,1,1] ~ dnorm(324,20) T(0,)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003
     IM[1,1,2] <- 0
     IM[1,1,3] <- IM[1,1,1] - IM[1,1,2]
     
-    IM[1,2,1] ~ dnorm(257,20) T(0,)                                  ### number of 2-year old survivors is very low because very few chicks hatched in 2002 - CAN BE MANIPULATED
+    IM[1,2,1] ~ dnorm(257,20) T(0,)                                  ### number of 2-year old survivors is very low because very few chicks hatched in 2002
     IM[1,2,2] <- IM[1,2,1]*p.juv.recruit.f[2]
     IM[1,2,3] <- IM[1,1,1] - IM[1,1,2]
     
-    IM[1,3,1] ~ dnorm(462,20) T(0,)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001 - CAN BE MANIPULATED
+    IM[1,3,1] ~ dnorm(462,20) T(0,)                                 ### number of 3-year old survivors is higher because many chicks hatched in 2001
     IM[1,3,2] <- IM[1,3,1]*p.juv.recruit.f[3]
     IM[1,3,3] <- IM[1,1,1] - IM[1,1,2]
     
-    IM[1,4,1] ~ dnorm(207,20) T(0,)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000 - CAN BE MANIPULATED
+    IM[1,4,1] ~ dnorm(207,20) T(0,)                                 ### number of 4-year old survivors is very low because few chicks hatched in 2000
     IM[1,4,2] <- IM[1,4,1]*p.juv.recruit.f[4]
     IM[1,4,3] <- IM[1,1,1] - IM[1,1,2]
     
-    IM[1,5,1] ~ dnorm(700,10) T(0,)                                  ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999  - CAN BE MANIPULATED
+    IM[1,5,1] ~ dnorm(700,10) T(0,)                                  ### number of 5-year old survivors is huge because a lot of chicks hatched in 1999
     IM[1,5,2] <- IM[1,5,1]*p.juv.recruit.f[5]
     IM[1,5,3] <- IM[1,1,1] - IM[1,1,2]
     
-    IM[1,6,1] ~ dnorm(225,20) T(0,)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously  - CAN BE MANIPULATED
+    IM[1,6,1] ~ dnorm(225,20) T(0,)                                 ### very uncertain number of of 6-year old survivors because no data from 1998 or previously
     IM[1,6,2] <- IM[1,6,1]*p.juv.recruit.f[6]
     IM[1,6,3] <- IM[1,1,1] - IM[1,1,2]
     
     for(age in 7:30) {
-    IM[1,age,1] ~ dbin(pow(mean.phi.ad,(age-1)), round(IM[1,age-1,3]))
-    IM[1,age,2] <- IM[1,age,1]*p.juv.recruit.f[age]
-    IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
+      IM[1,age,1] ~ dbin(pow(mean.phi.ad,(age-1)), round(IM[1,age-1,3]))
+      IM[1,age,2] <- IM[1,age,1]*p.juv.recruit.f[age]
+      IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
     }
     N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters - irrelevant in year 1 as already included in Ntot.breed prior
     
     Ntot.breed[1] ~ dnorm(1869,100) T(0,)  ### sum of counts is 1869
     JUV[1] ~ dnorm(510,100) T(0,)          ### sum of chicks is 510
-    N.atsea[1] ~ dnorm(530,20) T(0,)    ### unknown number - CAN BE MANIPULATED
+    N.atsea[1] ~ dnorm(530,20) T(0,)    ### unknown number
     Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea - does not include recruits in Year 1
     
     
@@ -234,7 +222,7 @@ model {
     
     ## define recruit probability for various ages ##
     for (age in 1:30) {
-    logit(p.juv.recruit[age,tt])<-mu.p.juv[2] + eps.p[tt+24] + (agebeta * age)
+      logit(p.juv.recruit[age,tt])<-mu.p.juv[2] + eps.p[tt+24] + (agebeta * age)
     }
     
     
@@ -259,7 +247,6 @@ model {
     
     ## THE BREEDING POPULATION ##
     # Ntot.breed comprised of first-time breeders, previous skippers, and previous unsuccessful breeders
-    # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
     
     N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
     N.breed.ready[tt] ~ dbin(p.ad[tt+24], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
@@ -495,7 +482,7 @@ nt <- 10
 nb <- 25000
 nad <- 2000
 nc <- 3
-ns <- 200000 #longest
+ns <- 200000 
 
 # RUN THE MODEL (took 3 days for ns=200000)
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
@@ -510,7 +497,7 @@ TRALipm <- run.jags(data=jags.data, inits=inits, parameters,
 
 
 #########################################################################
-# CREATE TABLES AND FIGURES FROM OUTPUT
+# CREATE TABLE AND FIGURE TO SUMMARISE POPULATION TRAJECTORY
 #########################################################################
 
 ## extract summary table from raw run.jags output
@@ -542,7 +529,6 @@ export<-predictions %>%
   mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
   mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
   mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
-  rename(Rhat=psrf) %>%
   arrange(demographic,Year)
 
 
@@ -556,6 +542,9 @@ TABLE1<-export %>%
                           "pop.growth.rate",
                           "mean.phi.ad",
                           "mean.phi.juv" )) 
+TABLE1
+
+
 
 
 ## PRODUCE FIGURE 1 THAT SHOWS POPULATION TRAJECTORY
@@ -565,7 +554,6 @@ TABLE1<-export %>%
 ## scenario 3: increasing mouse impacts on adult survival (adult survival decreases by 10%)
 
 export %>%
-  rename(lcl=Lower95,ucl=Upper95) %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
   arrange(Year) %>%
   mutate(Scenario="past, and no future change") %>%
