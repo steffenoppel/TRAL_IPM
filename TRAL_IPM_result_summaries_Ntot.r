@@ -16,6 +16,8 @@
 
 # updated 4 Oct 2021 to include Figure S2 (showing no difference in effort formulation)
 
+# updated 21 Dec 2021 to include revision suggestion by referees
+
 
 library(tidyverse)
 library(jagsUI)
@@ -152,6 +154,7 @@ ggplot(plot1_df) +
   geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
   #ylab() +
   #xlab("Year") +
+  geom_vline(aes(xintercept = 2021), colour="gray15", linetype = "dashed", size=1) +
   scale_y_continuous(breaks=seq(0,18000,2000), limits=c(0,20000),expand = c(0, 0))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
   #scale_linetype_manual(name="Breeding population",label="observed trend") +
