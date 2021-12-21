@@ -63,6 +63,8 @@
 
 ## 4 AUGUST 2021: revised priors in model based on Beth Clark's suggestions
 
+## 22 DECEMBER 2021: revision of manuscript started and included 2021 fecundity data
+
 
 library(tidyverse)
 library(lubridate)
@@ -83,7 +85,7 @@ select<-dplyr::select
 
 ## LOAD PREPARED M-ARRAY FOR SURVIVAL ESTIMATION
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-load("TRAL_IPM_input.marray.RData")
+load("TRAL_IPM_input.marray.REV2021.RData")
 
 ## BOTH ARRAYS MUST HAVE EXACT SAME DIMENSIONS
 dim(chick.marray)
@@ -661,10 +663,10 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 
 # Parameters monitored
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
-                "mean.recruit","pop.growth.rate","fut.growth.rate",
+                "mean.recruit","pop.growth.rate","fut.growth.rate","lambda",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
-                "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
+                "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad","p.juv","p.ad",
                 "mean.p.sd","sigma.p","sigma.phi")
 
 # MCMC settings
