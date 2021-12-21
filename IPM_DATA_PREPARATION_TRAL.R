@@ -12,6 +12,8 @@
 
 ## 18 June 2021: changed data preparation back to 2004, after 2008 model run did not improve convergence
 
+## 22 December 2021: re-ran data preparation with 2021 breeding success data included
+
 library(tidyverse)
 library(lubridate)
 library(data.table)
@@ -34,13 +36,13 @@ IPMstart<-2000 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
 #system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
-#system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
+system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
 load("GOUGH_seabird_CMR_data.RData")
 
 ## run the RODBC import of nest and count data in a 32-bit version of R
 #system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
-#system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
+system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
 
@@ -81,7 +83,8 @@ exclude <- nests %>%
 
 
 ### summary of breeding success per year from nests
-FECUND<-nests %>% filter(Year<2021) %>% filter(Species==SP) %>% mutate(count=1) %>%
+FECUND<-nests %>% filter(Species==SP) %>% mutate(count=1) %>%
+  mutate(SUCCESS=ifelse(Year==2021 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
   filter(!NestID %in% exclude$NestID) %>%
   group_by(Year,Colony) %>%
   summarise(n_nests=sum(count),BREED_SUCC=mean(SUCCESS, na.rm=T))
@@ -98,7 +101,8 @@ ggplot(FECUND, aes(x=Year,y=BREED_SUCC)) +geom_point(size=2, color='darkred')+ge
 
 
 ###   PREPARE A METRIC OF ANNUAL MEAN NEST FAILURE DATE
-nestfail<-nests %>% filter(Year<2021) %>% filter(Species==SP) %>% mutate(count=1) %>%
+nestfail<-nests %>% filter(Species==SP) %>% mutate(count=1) %>%
+  mutate(SUCCESS=ifelse(Year==2021 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
   filter(!NestID %in% exclude$NestID) %>%
   filter(SUCCESS==0) %>%
   mutate(LastDay=yday(DateLastAlive)) %>%
@@ -210,7 +214,8 @@ theme(panel.background=element_rect(fill="white", colour="black"),
 ### COPIED FROM C:\STEFFEN\RSPB\UKOT\Gough\ANALYSIS\SeabirdSurvival\TRAL_survival_marray.r
 
 ## filter data for the selected species
-contacts<-contacts %>% filter(SpeciesCode==SP) ## %>% filter(Location %in% c("Hummocks","Gonydale","Tafelkop","Not Specified")) - this removes age info for chicks ringed elsewhere!
+contacts<-contacts %>% filter(SpeciesCode==SP)  ## %>% filter(Location %in% c("Hummocks","Gonydale","Tafelkop","Not Specified")) - this removes age info for chicks ringed elsewhere!
+dim(contacts)
 ages<-ages %>% filter(SpeciesCode==SP)
 bands<-bands %>% filter(SpeciesCode==SP)
 
@@ -242,7 +247,9 @@ dim(MISSAGE)
 contacts<-contacts %>%
   mutate(Contact_Year=if_else(is.na(Contact_Year),as.integer(year(Date_Time)),Contact_Year)) %>%
   mutate(Contact_Year=if_else(as.integer(month(Date_Time))==12 & !(Age %in% c("Chick","Fledgling")),Contact_Year+1,as.numeric(Contact_Year))) %>%
-  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==1 & (Age %in% c("Chick","Fledgling")),Contact_Year-1,as.numeric(Contact_Year)))
+  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==1 & (Age %in% c("Chick","Fledgling")),Contact_Year-1,as.numeric(Contact_Year))) %>%
+  filter(Contact_Year<2022) 
+dim(contacts)
 dim(contacts)
 head(contacts)
 
@@ -358,7 +365,7 @@ ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity
         legend.position=c(0.15, 0.90),
         panel.border = element_blank()) 
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\FigS1.jpg", width=9, height=6)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\submitted\\TRAL_IPM\\FigS1_rev.jpg", width=9, height=6)
 
 
 
@@ -626,7 +633,7 @@ for (l in 1:length(TRAL.pop$Year)){
 }
 TRAL.pop$tot<-rowSums(TRAL.pop[,2:9], na.rm=T)
 
-### CALCULATE CHANE FROM ONE YEAR TO NEXT
+### CALCULATE CHANGE FROM ONE YEAR TO NEXT
 TRAL.pop %>% ungroup() %>%
   mutate(tot=ifelse(Year==2011,NA,tot)) %>%
   mutate(change=((tot/prop.counted)-(dplyr::lag(tot)/dplyr::lag(prop.counted)))/(dplyr::lag(tot)/dplyr::lag(prop.counted))) %>%
@@ -653,4 +660,4 @@ TRAL.pop %>% ungroup() %>%
 ##   11. SAVE WORKSPACE ###############
 #############################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_input.marray.RData")
+save.image("TRAL_IPM_input.marray.REV2021.RData")
