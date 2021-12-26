@@ -732,6 +732,6 @@ max(predictions$Rhat)
 
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_FINAL.RData")
+save.image("TRAL_IPM_output_FINAL_REV2021.RData")
 
 
