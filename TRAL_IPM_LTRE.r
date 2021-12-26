@@ -14,8 +14,7 @@ library(runjags)
 #library(nimble)
 filter<-dplyr::filter
 select<-dplyr::select
-library(grid)
-library(magick)
+
 
 
 #########################################################################
@@ -25,7 +24,7 @@ library(magick)
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
-load("TRAL_IPM_output_FINAL.RData")
+load("TRAL_IPM_output_FINAL_REV2021.RData")
 ls()
 
 
@@ -36,89 +35,221 @@ ls()
 ### predictions created in TRAL_IPM_FINAL.r
 
 ### need the following parameters from model
-lambda.r::ann.fec
-p.juv
-phi.juv
-p.ad
-phi.ad
-Ntot.breed
-Ntot
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[17]") # lambda: 8-24
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[26]") # phi.ad: 159-175
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.juv[26]") # phi.juv: 201-217
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[17]") # ann.fec: 236 - 253
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="p.ad[26]") # p.ad: 2191-2208
 
-
-
-## # Step 1: Using the JAGS output (App. S6; named lescipm6dadwingpiece.jags),         # compute realized population growth rates for female lesser scaup. 
+## # Step 1: Using the JAGS output (named TRALipm$mcmc),         # compute realized population growth rates for Tristan Albatross 
 library(matrixStats)
-samples <- 5000
-noyears <- 59
-lam_real <- matrix(0,samples,noyears)
-F1 <- matrix(0,samples,noyears)
-F2 <- matrix(0,samples,noyears)
-Sfj <- matrix(0,samples,noyears)
-Sfa <- matrix(0,samples,noyears)
-Smj <- matrix(0,samples,noyears)
-Sma <- matrix(0,samples,noyears)
-for (i in 1:noyears){
-  for (j in 1:samples){
-    # Account for a census timing that was different than banding timing
-    F1[j,i] <- lescipm6dadwingpiece$sims.list$f1[j,i+1]
-    F2[j,i] <- lescipm6dadwingpiece$sims.list$f2[j,i+1]
-    Sfj[j,i] <- lescipm6dadwingpiece$sims.list$juvs[j,2,i+1]
-    Sfa[j,i] <- ((lescipm6dadwingpiece$sims.list$anns[j,2,i])^(1/12))^3 * 
-      ((lescipm6dadwingpiece$sims.list$anns[j,2,i+1])^(1/12))^9
-    Smj[j,i] <- lescipm6dadwingpiece$sims.list$juvs[j,1,i+1]
-    Sma[j,i] <- ((lescipm6dadwingpiece$sims.list$anns[j,1,i])^(1/12))^3 * 
-      ((lescipm6dadwingpiece$sims.list$anns[j,1,i+1])^(1/12))^9
-    lam_real[j,i] <- (lescipm6dadwingpiece$sims.list$N1f[j,i+1] + 
-                        lescipm6dadwingpiece$sims.list$N2f[j,i+1]) /
-      (lescipm6dadwingpiece$sims.list$N1f[j,i] +   
-         lescipm6dadwingpiece$sims.list$N2f[j,i])
+lam <- as.matrix(TRALipm$mcmc[[1]][,c(8:24)])
+Sa <- as.matrix(TRALipm$mcmc[[1]][,c(159:175)])
+Sj <- as.matrix(TRALipm$mcmc[[1]][,c(201:217)])
+Fec <- as.matrix(TRALipm$mcmc[[1]][,c(236:252)])
+Bp <- as.matrix(TRALipm$mcmc[[1]][,c(2191:2207)])
+
+
+# Account for different start of time series for survival and fecundity data
+for(ch in 2:nc){
+  lam<-rbind(lam,as.matrix(TRALipm$mcmc[[ch]][,c(8:24)]))
+  Sa<-rbind(Sa,as.matrix(TRALipm$mcmc[[ch]][,c(159:175)]))  ## only for the years coinciding with the fecundity and pop size
+  Sj<-rbind(Sj,as.matrix(TRALipm$mcmc[[ch]][,c(201:217)]))  ## only for the years coinciding with the fecundity and pop size
+  Fec<-rbind(Fec,as.matrix(TRALipm$mcmc[[ch]][,c(236:252)]))  ## without the last year for which no lambda is available
+  Bp<-rbind(Bp,as.matrix(TRALipm$mcmc[[ch]][,c(2191:2207)]))  ## only for the years coinciding with the fecundity and pop size
   }
-}
-tempvar_real <- rowVars(lam_real)
+
+tempvar_real <- rowVars(lam)
 mean(tempvar_real)
 quantile(tempvar_real,0.05)
 quantile(tempvar_real,0.95)
 
-# Step 2: Calculate stage-specific proportions of abundances for each female # age class at each time step and for each of the saved MCMC samples. 
-noyears <- 60   # we just used the first 59 of these below
-nf1 <- matrix(0,samples,noyears)
-nf2 <- matrix(0,samples,noyears)
-for (i in 1:noyears){
-  for (j in 1:samples){
-    nf1[j,i] <- lescipm6dadwingpiece$sims.list$N1f[j,i] /
-      (lescipm6dadwingpiece$sims.list$N1f[j,i] +
-         lescipm6dadwingpiece$sims.list$N2f[j,i])
-    nf2[j,i] <- lescipm6dadwingpiece$sims.list$N2f[j,i] /
-      (lescipm6dadwingpiece$sims.list$N1f[j,i]+
-         lescipm6dadwingpiece$sims.list$N2f[j,i])
-  }
-}
-nf1 <- nf1[,1:59]
-nf2 <- nf2[,1:59]
 
-# Step 3: Calculate the transient sensitivities for each demographic         # parameter, evaluated at temporal means of each parameter. 
-sens_F1 <- matrix(0,samples,1)
-sens_F2 <- matrix(0,samples,1)
-sens_Sfj <- matrix(0,samples,1)
-sens_Sfa <- matrix(0,samples,1)
-sens_nf1 <- matrix(0,samples,1)
-sens_nf2 <- matrix(0,samples,1)
-mu_F1 <- rowMeans(F1)
-mu_F2 <- rowMeans(F2)
-mu_Sfj <- rowMeans(Sfj)
-mu_Sfa <- rowMeans(Sfa)
-mu_nf1 <- rowMeans(nf1)
-mu_nf2 <- rowMeans(nf2)
+
+
+# Step 2: Extract population sizes at each time step and for each of the saved MCMC samples. 
+
+### need the following parameters from model
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]") # Ntot: 26-43
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[1]") # Ntot.breed: 218-235
+
+Ntot <- as.matrix(TRALipm$mcmc[[1]][,c(26:43)])
+Nbreed <- as.matrix(TRALipm$mcmc[[1]][,c(218:235)])
+for(ch in 2:nc){
+  Ntot<-rbind(Ntot,as.matrix(TRALipm$mcmc[[ch]][,c(26:43)]))
+  Nbreed<-rbind(Nbreed,as.matrix(TRALipm$mcmc[[ch]][,c(218:235)]))  ## only for the years coinciding with the fecundity and pop size
+}
+
+#proportion of "breeders" of the total population size
+prop_breed<-(Nbreed)/Ntot
+
+
+
+
+
+
+
+
+
+############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
+
+dim(lam)
+corplot.l<-data.frame(lambda=colMeans(lam),lcl.lam=apply(lam,2,quantile,probs = 0.025, na.rm = TRUE),ucl.lam=apply(lam,2,quantile,probs = 0.975, na.rm = TRUE),Year=c(2004:2020))
+corplot.f<-data.frame(parm=dimnames(Fec)[[2]],value=colMeans(Fec),Year=c(2004:2020),dem="Breeding success",lcl=apply(Fec,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Fec,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sa<-data.frame(parm=dimnames(Sa)[[2]],value=colMeans(Sa),Year=c(2004:2020),dem="Adult survival",lcl=apply(Sa,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sa,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sj<-data.frame(parm=dimnames(Sj)[[2]],value=colMeans(Sj),Year=c(2004:2020),dem="Juvenile survival",lcl=apply(Sj,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sj,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Bp<-data.frame(parm=dimnames(Nbreed)[[2]],value=colMeans(Nbreed),Year=c(2004:2021),dem="N breeding pairs",lcl=apply(Nbreed,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Nbreed,2,quantile,probs = 0.975, na.rm = TRUE))
+
+corplot<-bind_rows(corplot.f,corplot.Sa,corplot.Sj,corplot.Bp) %>%
+  left_join(corplot.l, by="Year")
+
+cor.test()
+  
+  ggplot(corplot) + geom_point(aes(x=lambda,y=value)) +
+    facet_wrap(~dem, scales="free_y") +
+    geom_errorbar(aes(x=lambda,ymin=lcl,ymax=ucl), color='grey85') +
+    geom_errorbarh(aes(y=value,xmin=lcl.lam,xmax=ucl.lam), color='grey85') +
+    geom_point(aes(x=lambda,y=value)) +
+    #geom_smooth(aes(x=lambda,y=value), method="lm") +
+    geom_vline(aes(xintercept = 1), colour="darkred", size=1, linetype = "dashed") +
+    #geom_abline(slope=1,colour="grey85", linetype = "dashed", size=1) +
+    geom_point(aes(x=lambda,y=value)) +
+    
+    xlab("Annual population growth rate") +
+    ylab("Demographic parameter value") +
+    scale_x_continuous(breaks=seq(0.75,1.1,0.05), limits=c(0.75,1.11))+
+    
+    theme(panel.background=element_rect(fill="white", colour="black"), 
+          axis.text=element_text(size=14, color="black"),
+          strip.text=element_text(size=16, color="black"),
+          strip.background=element_rect(fill="white", colour="black"),
+          #axis.text.x=element_text(size=12, color="black", angle=45, vjust = 1, hjust=1), 
+          axis.title=element_text(size=16), 
+          panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(), 
+          panel.border = element_blank())
+
+  ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig4_rev.jpg", width=14, height=12)
+  
+
+
+
+
+
+
+
+# Step 3: Calculate the transient sensitivities for each demographic parameter, evaluated at temporal means of each parameter. 
+sens_Fec <- matrix(0,dim(Fec)[1],1)
+sens_Sj <- matrix(0,dim(Sj)[1],1)
+sens_Sa <- matrix(0,dim(Sa)[1],1)
+sens_Bp <- matrix(0,dim(Bp)[1],1)
+sens_Ntot <- matrix(0,dim(Ntot)[1],1)
+sens_Nbreed <- matrix(0,dim(Nbreed)[1],1)
+
+mu_Fec <- rowMeans(Fec)
+mu_Sj <- rowMeans(Sj)
+mu_Sa <- rowMeans(Sa)
+mu_Bp <- rowMeans(Bp)
+mu_Ntot <- rowMeans(Ntot)
+mu_Nbreed <- rowMeans(Nbreed)
+
+
+### CODE FROM KOONS et al. 2017 - not sure how sensitivities are calculated here
 for (j in 1:samples){
-  sens_F1[j] <- (0.5*mu_Sfj[j]*mu_nf1[j])
-  sens_F2[j] <- (0.5*mu_Sfj[j]*mu_nf2[j])
-  sens_Sfj[j] <- (0.5*mu_F1[j]*mu_nf1[j]+0.5*mu_F2[j]*mu_nf2[j])
-  sens_Sfa[j] <- 1
-  sens_nf1[j] <- (0.5*mu_F1[j]*mu_Sfj[j]+mu_Sfa[j]) -
+  sens_Fec[j] <- (0.5*mu_Sj[j]*mu_Nbreed[j])
+  sens_Sj[j] <- (0.5*mu_Fec[j]*mu_Nbreed[j])
+  sens_Bp[j] <- (0.5*mu_Sa[j]*mu_Nbreed[j])
+  sens_Sa[j] <- 1
+  sens_Nbreed[j] <- (0.5*mu_F1[j]*mu_Sfj[j]+mu_Sfa[j]) -
     (0.5*mu_Sfj[j]*(mu_F1[j]*mu_nf1[j]+mu_F2[j]*mu_nf2[j])+mu_Sfa[j]) 
-  sens_nf2[j] <- (0.5*mu_F2[j]*mu_Sfj[j]+mu_Sfa[j]) -
+  sens_Ntot[j] <- (0.5*mu_F2[j]*mu_Sfj[j]+mu_Sfa[j]) -
     (0.5*mu_Sfj[j]*(mu_F1[j]*mu_nf1[j]+mu_F2[j]*mu_nf2[j])+mu_Sfa[j])
 }
+
+### calculate sensitivities in popbio
+library(popbio)
+for (j in 1:samples){
+  seabird.vr<-list(Sj=mu_Sj[j],  Sa= mu_Sa[j], Fec= mu_Fec[j], Bp=mu_Bp[j])
+  seabird.el<-expression(
+    0,  0,  Fec,
+    (0.5*Sj), 0,  0,
+    0,  (Sj^(6)*Bp), Sa)
+  x<-vitalsens(seabird.el, seabird.vr)
+  sens_Fec[j] <- x[3,2]
+  sens_Sj[j] <- x[1,2]
+  sens_Bp[j] <- x[4,2]
+  sens_Sa[j] <- x[2,2]
+}
+
+### from Paquet
+
+
+###transient mean sensitivities
+
+sens_fec.kestrel.pois <- matrix(0,samples,chains)
+sens_phi.kestrel.pois <- matrix(0,samples,chains)
+sens_phij.kestrel.pois <- matrix(0,samples,chains)
+sens_Imm.kestrel.pois <- matrix(0,samples,chains)
+sens_Nad.kestrel.pois <- matrix(0,samples,chains)
+
+
+for(c in 1:chains){
+  for (i in 1:samples){
+    sens_fec.kestrel.pois[i,c]<-mean_phij.kestrel.pois[i,c]*mean_prop_ad.kestrel.pois[i,c]+mean_phij.kestrel.pois[i,c]*(1-mean_prop_ad.kestrel.pois[i,c])*zj.kestrel.pois$prob.breedyoung[1,i,c]
+    sens_phi.kestrel.pois[i,c]<-1
+    sens_phij.kestrel.pois[i,c]<-mean_fec.kestrel.pois[i,c]*mean_prop_ad.kestrel.pois[i,c]+mean_fec.kestrel.pois[i,c]*(1-mean_prop_ad.kestrel.pois[i,c])*zj.kestrel.pois$prob.breedyoung[1,i,c]
+    sens_Imm.kestrel.pois[i,c]<-1
+    sens_Nad.kestrel.pois[i,c]<-(mean_fec.kestrel.pois[i,c]*mean_phij.kestrel.pois[i,c]+mean_phi.kestrel.pois[i,c])-(mean_fec.kestrel.pois[i,c]*mean_phij.kestrel.pois[i,c]*mean_prop_ad.kestrel.pois[i,c]+mean_phi.kestrel.pois[i,c]+mean_fec.kestrel.pois[i,c]*mean_phij.kestrel.pois[i,c]*zj.kestrel.pois$prob.breedyoung[1,i,c]*(1-mean_prop_ad.kestrel.pois[i,c]))
+  }}
+
+###transient mean contributions
+
+cont_fec.kestrel.pois <- matrix(0,samples,chains)
+cont_phi.kestrel.pois <- matrix(0,samples,chains)
+cont_phij.kestrel.pois <- matrix(0,samples,chains)
+cont_Imm.kestrel.pois <- matrix(0,samples,chains)
+cont_Nad.kestrel.pois<- matrix(0,samples,chains)
+cont_tot.kestrel.pois <- matrix(0,samples,chains)
+
+for(c in 1:chains){
+  for (i in 1:samples){
+    dp_stoch <- cbind(zj.kestrel.pois$fec[2:(nyears-1),i,c],zj.kestrel.pois$phi[2,2:(nyears-1),i,c],zj.kestrel.pois$phi[1,2:(nyears-1),i,c],Immrate.kestrel.pois[2:(nyears-1),i,c],prop_ad.kestrel.pois[2:(nyears-1),i,c])
+    # Derive process variance and among demographic parameters using
+    # 'shrinkage' estimates of vital rates and proportionate abundances:
+    dp_varcov <- var(dp_stoch)
+    sensvec <- c( sens_fec.kestrel.pois[i,c], sens_phi.kestrel.pois[i,c], sens_phij.kestrel.pois[i,c],sens_Imm.kestrel.pois[i,c],sens_Nad.kestrel.pois[i,c])
+    # calculate demographic contributions
+    contmatrix <- matrix(0,5,5)
+    
+    for (k in 1:5){
+      for (m in 1:5){
+        contmatrix[k,m] <- dp_varcov[k,m]*sensvec[k]*sensvec[m]
+      }#m
+    }#k
+    contributions <- rowSums(contmatrix)
+    
+    cont_fec.kestrel.pois[i,c] <- contributions[1]
+    cont_phi.kestrel.pois[i,c] <- contributions[2]
+    cont_phij.kestrel.pois[i,c] <- contributions[3]
+    cont_Imm.kestrel.pois[i,c] <- contributions[4]
+    cont_Nad.kestrel.pois[i,c] <- contributions[5]
+    cont_tot.kestrel.pois[i,c]<-sum(contributions[])
+  }}
+
+mean(cont_Imm.kestrel.pois)
+quantile(cont_Imm.kestrel.pois,c(0.025,0.975))
+
+#mean proportion of variation in growth rate explained by variation in immigration rate (can't be properly calculated on the posteriors)
+mean(cont_Imm.kestrel.pois)/mean(cont_tot.kestrel.pois)
+
+#Note that the LTRE contribution of "the other demographic rates, as shown in Fig. 4 can be obtained by subtracting the contribution of immigration from the total contribution
+mean(cont_tot.kestrel.pois-cont_Imm.kestrel.pois)
+quantile(cont_tot.kestrel.pois-cont_Imm.kestrel.pois,c(0.025,0.975))
+
+####
+
+
+
 
 # Step 4: Calculate the LTRE contributions of temporal process (co)variation # in the demographic parameters to temporal variation in the realized 
 # population growth rates.
@@ -157,8 +288,8 @@ mean(totalcont)
 quantile(totalcont,0.05)
 quantile(totalcont,0.95)
 
-The only difference for implementing Eq. 2 is that the sensitivities are evaluated at means between successive time steps, and that instead of computing (co)variation in a demographic parameter over time, one simply computes the difference between successive time steps.
-Annotated R code for implementing key steps of the transient LTRE for change in geometric mean rates of growth between two focal periods of time (Eq. 3 of the main text):
+#The only difference for implementing Eq. 2 is that the sensitivities are evaluated at means between successive time steps, and that instead of computing (co)variation in a demographic parameter over time, one simply computes the difference between successive time steps.
+#Annotated R code for implementing key steps of the transient LTRE for change in geometric mean rates of growth between two focal periods of time (Eq. 3 of the main text):
   # Step 1: Provide the symbolic matrix structure, and calculate symbolic      # derivatives of the matrix with respect to change in lower-level vital      # rates.
   matrix.elements <- expression(0.5*F1*Sfj, 0.5*F2*Sfj,
                                 Sfa,        Sfa)
