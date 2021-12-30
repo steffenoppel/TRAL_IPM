@@ -720,8 +720,9 @@ predictions <- data.frame(summary(addsummary_tralipm),
 head(predictions)
 row.names(predictions) <- 1:nrow(predictions)
 
-predictions <- predictions[1:218,]   ### 200 cuts off ann.fec
+predictions <- predictions[1:253,]   ### 200 cuts off ann.fec
 #predictions[1:5,]
+tail(predictions)
 
 predictions$Mode <- NULL
 np <- names(predictions) 

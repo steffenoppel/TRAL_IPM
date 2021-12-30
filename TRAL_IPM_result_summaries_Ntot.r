@@ -43,7 +43,7 @@ library(magick)
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
-load("TRAL_IPM_output_FINAL.RData")
+load("TRAL_IPM_output_FINAL_REV2021.RData")
 imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
 TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
@@ -52,10 +52,16 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 #########################################################################
 # PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
 #########################################################################
-### predictions created in TRAL_IPM_FINAL.r
+### predictions created in TRAL_IPM_FINAL.r are wrong and omit ann.fec
+predictions <- data.frame(summary(addsummary_tralipm),
+                          parameter = row.names(summary(addsummary_tralipm)))
+row.names(predictions) <- 1:nrow(predictions)
+predictions <- predictions[1:253,]
 
 ## write output into file ##
-export<-predictions %>%
+export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
+  filter(!grepl("Ntot.breed",parameter)) %>%
+  #filter(!grepl("agebeta",parameter)) %>%
   mutate(Year=c(
     rep(NA,8),         ## for mean phi, p, and growth rates
     seq(2004,2021,1),   ## for N.tot
@@ -160,7 +166,8 @@ ggplot(plot1_df) +
   geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
   #ylab() +
   #xlab("Year") +
-  geom_vline(aes(xintercept = 2021), colour="gray15", linetype = "dashed", size=1) +
+  #geom_vline(aes(xintercept = 2022), colour="gray15", linetype = "dashed", size=1) +
+  geom_segment(aes(x = 2022, y = 0, xend = 2022, yend = 14000), colour="gray15", linetype = "dashed", size=1)+
   scale_y_continuous(breaks=seq(0,18000,2000), limits=c(0,20000),expand = c(0, 0))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
   #scale_linetype_manual(name="Breeding population",label="observed trend") +
@@ -170,7 +177,7 @@ ggplot(plot1_df) +
        linetype="Breeding population") +
   
   ### add the bird icons
-  annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
+  annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=14000, ymax=20000) +
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
@@ -186,7 +193,7 @@ ggplot(plot1_df) +
         panel.border = element_rect(fill=NA, colour = "black"))
 
 ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig1.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig1_revised.jpg", width=14, height=8)
 
 
 ## ALTERNATIVE PLOT WITH TWO SEPARATE AXES
@@ -262,7 +269,7 @@ which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]")
 ## collate all samples
 Ntot.f.samp<-data.frame()
 for(ch in 1:nc){
-  Ntot.f.samp<-bind_rows(Ntot.f.samp,as.data.frame((TRALipm$mcmc[[ch]])[,c(9,114:116)]))
+  Ntot.f.samp<-bind_rows(Ntot.f.samp,as.data.frame((TRALipm$mcmc[[ch]])[,c(26,131:133)]))
 }
 head(Ntot.f.samp)
 dim(Ntot.f.samp)
@@ -313,7 +320,7 @@ Ntot.f.samp %>% rename(nochange=`Ntot.f[1,30]`,erad=`Ntot.f[2,30]`,worse=`Ntot.f
         panel.border = element_rect(fill=NA, colour = "black"))
 
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS5.jpg", width=14, height=8)
 
 
 
