@@ -22,8 +22,6 @@ select<-dplyr::select
 #########################################################################
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-#load("TRAL_IPM_output_2020.RData")
-#load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 load("TRAL_IPM_output_FINAL_REV2021.RData")
 ls()
 
@@ -32,8 +30,6 @@ ls()
 #########################################################################
 # IMPLEMENT LTRE using code from Koons et al. 2017
 #########################################################################
-### predictions created in TRAL_IPM_FINAL.r
-
 ### need the following parameters from model
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[17]") # lambda: 8-24
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[26]") # phi.ad: 159-175
@@ -82,69 +78,6 @@ for(ch in 2:nc){
 
 #proportion of "breeders" of the total population size
 prop_breed<-(Nbreed)/Ntot
-
-
-
-############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
-
-dim(lam)
-corplot.l<-data.frame(lambda=colMeans(lam),lcl.lam=apply(lam,2,quantile,probs = 0.025, na.rm = TRUE),ucl.lam=apply(lam,2,quantile,probs = 0.975, na.rm = TRUE),Year=c(2004:2020))
-corplot.f<-data.frame(parm=dimnames(Fec)[[2]],value=colMeans(Fec),Year=c(2004:2020),dem="Breeding success",lcl=apply(Fec,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Fec,2,quantile,probs = 0.975, na.rm = TRUE))
-corplot.Sa<-data.frame(parm=dimnames(Sa)[[2]],value=colMeans(Sa),Year=c(2004:2020),dem="Adult survival",lcl=apply(Sa,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sa,2,quantile,probs = 0.975, na.rm = TRUE))
-corplot.Sj<-data.frame(parm=dimnames(Sj)[[2]],value=colMeans(Sj),Year=c(2004:2020),dem="Juvenile survival",lcl=apply(Sj,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sj,2,quantile,probs = 0.975, na.rm = TRUE))
-corplot.Bp<-data.frame(parm=dimnames(Nbreed)[[2]],value=colMeans(Nbreed),Year=c(2004:2021),dem="N breeding pairs",lcl=apply(Nbreed,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Nbreed,2,quantile,probs = 0.975, na.rm = TRUE))
-
-corplot<-bind_rows(corplot.f,corplot.Sa,corplot.Sj,corplot.Bp) %>%
-  left_join(corplot.l, by="Year")
-
-### Pearson correlation tests
-test.vals<-corplot %>% group_by(dem) %>% summarise(x=min(lcl)) %>% mutate(text=NA)
-ct.f<-cor.test(corplot.l$lambda,corplot.f$value)
-test.vals$text[2]<-paste("r = ",round(ct.f$estimate,2)," (",round(ct.f$conf.int[1],2),", ",round(ct.f$conf.int[2],2),")", sep="")
-
-ct.Sa<-cor.test(corplot.l$lambda,corplot.Sa$value)
-test.vals$text[1]<-paste("r = ",round(ct.Sa$estimate,2)," (",round(ct.Sa$conf.int[1],2),", ",round(ct.Sa$conf.int[2],2),")", sep="")
-
-ct.Sj<-cor.test(corplot.l$lambda,corplot.Sj$value)
-test.vals$text[3]<-paste("r = ",round(ct.Sj$estimate,2)," (",round(ct.Sj$conf.int[1],2),", ",round(ct.Sj$conf.int[2],2),")", sep="")
-
-ct.Bp<-cor.test(corplot.l$lambda,corplot.Bp$value[corplot.Bp$Year<2021])
-test.vals$text[4]<-paste("r = ",round(ct.Bp$estimate,2)," (",round(ct.Bp$conf.int[1],2),", ",round(ct.Bp$conf.int[2],2),")", sep="")
-
-
-## create PLOT
-ggplot(corplot) + geom_point(aes(y=lambda,x=value)) +
-    facet_wrap(~dem, scales="free_x") +
-    geom_errorbarh(aes(y=lambda,xmin=lcl,xmax=ucl), color='grey85') +
-    geom_errorbar(aes(x=value,ymin=lcl.lam,ymax=ucl.lam), color='grey85') +
-    geom_point(aes(y=lambda,x=value)) +
-    #geom_smooth(aes(x=lambda,y=value), method="lm") +
-    geom_hline(aes(yintercept = 1), colour="darkred", size=1, linetype = "dashed") +
-    #geom_abline(slope=1,colour="grey85", linetype = "dashed", size=1) +
-    geom_point(aes(y=lambda,x=value)) +
-    geom_text(data=test.vals,aes(y = 1.10, x = x, label = text), hjust=0, vjust = 1, size=3) +
-    
-    ylab("Annual population growth rate") +
-    xlab("Demographic parameter value") +
-    scale_y_continuous(breaks=seq(0.8,1.1,0.1), limits=c(0.75,1.11))+
-    
-    theme(panel.background=element_rect(fill="white", colour="black"), 
-          axis.text=element_text(size=14, color="black"),
-          strip.text=element_text(size=16, color="black"),
-          strip.background=element_rect(fill="white", colour="black"),
-          #axis.text.x=element_text(size=12, color="black", angle=45, vjust = 1, hjust=1), 
-          axis.title=element_text(size=16), 
-          panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(), 
-          panel.border = element_blank())
-
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig4_rev.jpg", width=9, height=8)
-
-
-
-
-
-
 
 
 # Step 3: Calculate the transient sensitivities for each demographic parameter, evaluated at temporal means of each parameter. 
@@ -200,7 +133,7 @@ for (j in 1:dim(Fec)[1]){
 
 
 
-###transient mean contributions
+### transient mean contributions
 
 cont_Fec <- matrix(0,dim(Fec)[1],1)
 cont_Sj <- matrix(0,dim(Sj)[1],1)
@@ -233,7 +166,7 @@ for (i in 1:dim(Fec)[1]){
 }
 
 
-# Step 5: Calculate desired statistics (e.g. the mean and Bayesian credible  # interval) from the derived posterior distributions of the LTRE contributions. 
+# Step 5: Calculate the mean and Bayesian credible interval from the derived posterior distributions of the LTRE contributions. 
 mean(cont_tot)
 quantile(cont_tot,0.05)
 quantile(cont_tot,0.95)
@@ -251,5 +184,69 @@ quantile(cont_Sj,c(0.025,0.975))/quantile(cont_tot,c(0.025,0.975))
 
 mean(cont_Nbreed)/mean(cont_tot)
 quantile(cont_Nbreed,c(0.025,0.975))/quantile(cont_tot,c(0.025,0.975))
+
+
+
+
+
+
+############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
+
+dim(lam)
+corplot.l<-data.frame(lambda=colMeans(lam),lcl.lam=apply(lam,2,quantile,probs = 0.025, na.rm = TRUE),ucl.lam=apply(lam,2,quantile,probs = 0.975, na.rm = TRUE),Year=c(2004:2020))
+corplot.f<-data.frame(parm=dimnames(Fec)[[2]],value=colMeans(Fec),Year=c(2004:2020),dem="Breeding success",lcl=apply(Fec,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Fec,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sa<-data.frame(parm=dimnames(Sa)[[2]],value=colMeans(Sa),Year=c(2004:2020),dem="Adult survival",lcl=apply(Sa,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sa,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sj<-data.frame(parm=dimnames(Sj)[[2]],value=colMeans(Sj),Year=c(2004:2020),dem="Juvenile survival",lcl=apply(Sj,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sj,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Bp<-data.frame(parm=dimnames(Nbreed)[[2]],value=colMeans(Nbreed),Year=c(2004:2021),dem="N breeding pairs",lcl=apply(Nbreed,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Nbreed,2,quantile,probs = 0.975, na.rm = TRUE))
+
+corplot<-bind_rows(corplot.f,corplot.Sa,corplot.Sj,corplot.Bp) %>%
+  left_join(corplot.l, by="Year")
+
+### Pearson correlation tests
+test.vals<-corplot %>% group_by(dem) %>% summarise(x=min(lcl)) %>% mutate(text=NA)
+ct.f<-cor.test(corplot.l$lambda,corplot.f$value)
+test.vals$text[2]<-paste("r = ",round(ct.f$estimate,2)," (",round(ct.f$conf.int[1],2),", ",round(ct.f$conf.int[2],2),")", sep="")
+
+ct.Sa<-cor.test(corplot.l$lambda,corplot.Sa$value)
+test.vals$text[1]<-paste("r = ",round(ct.Sa$estimate,2)," (",round(ct.Sa$conf.int[1],2),", ",round(ct.Sa$conf.int[2],2),")", sep="")
+
+ct.Sj<-cor.test(corplot.l$lambda,corplot.Sj$value)
+test.vals$text[3]<-paste("r = ",round(ct.Sj$estimate,2)," (",round(ct.Sj$conf.int[1],2),", ",round(ct.Sj$conf.int[2],2),")", sep="")
+
+ct.Bp<-cor.test(corplot.l$lambda,corplot.Bp$value[corplot.Bp$Year<2021])
+test.vals$text[4]<-paste("r = ",round(ct.Bp$estimate,2)," (",round(ct.Bp$conf.int[1],2),", ",round(ct.Bp$conf.int[2],2),")", sep="")
+
+
+## create PLOT
+ggplot(corplot) + geom_point(aes(y=lambda,x=value)) +
+  facet_wrap(~dem, scales="free_x") +
+  geom_errorbarh(aes(y=lambda,xmin=lcl,xmax=ucl), color='grey85') +
+  geom_errorbar(aes(x=value,ymin=lcl.lam,ymax=ucl.lam), color='grey85') +
+  geom_point(aes(y=lambda,x=value)) +
+  #geom_smooth(aes(x=lambda,y=value), method="lm") +
+  geom_hline(aes(yintercept = 1), colour="darkred", size=1, linetype = "dashed") +
+  #geom_abline(slope=1,colour="grey85", linetype = "dashed", size=1) +
+  geom_point(aes(y=lambda,x=value)) +
+  geom_text(data=test.vals,aes(y = 1.10, x = x, label = text), hjust=0, vjust = 1, size=3) +
+  
+  ylab("Annual population growth rate") +
+  xlab("Demographic parameter value") +
+  scale_y_continuous(breaks=seq(0.8,1.1,0.1), limits=c(0.75,1.11))+
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=14, color="black"),
+        strip.text=element_text(size=16, color="black"),
+        strip.background=element_rect(fill="white", colour="black"),
+        #axis.text.x=element_text(size=12, color="black", angle=45, vjust = 1, hjust=1), 
+        axis.title=element_text(size=16), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank())
+
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS4.jpg", width=9, height=8)
+
+
+
+
 
 
