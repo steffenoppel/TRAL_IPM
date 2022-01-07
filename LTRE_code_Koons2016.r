@@ -25,7 +25,7 @@ rm(list=ls())
 
 ### instead of simulating vital rates, we extracted real data from IPM output of TRAL
 # 
-# setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 # load("TRAL_IPM_output_FINAL_REV2021.RData")
 # 
 # 
@@ -54,8 +54,8 @@ rm(list=ls())
 # rm(list= ls()[!(ls() %in% c('Sa','Sj','rho','all','br','nb','matrix.elements','gr','sensrho','sensSj','sensSa','sensnb','sensbr'))])
 # save.image("TRAL_LTRE_input.RData")
 load("TRAL_LTRE_input.RData")
-
-
+input<-data.frame(Year=seq(2004:2021),Sa=c(Sa[1,],NA), Sj=c(Sj[1,],NA),Fec=c(rho[1,],NA),n.breed=br[1,],n.nonbreed=nb[1,])
+fwrite(input,"LTRE_input.csv")
 
 # Step 1: Symbolically define the structure of the matrix population model.
 
