@@ -40,9 +40,9 @@ model {
     # -------------------------------------------------        
     # 1.2. Priors and constraints FOR POPULATION COUNTS
     # -------------------------------------------------
-    for (s in 1:n.sites){			### start loop over every study area
-      for (t in 1:T){			### start loop over every year
-        sigma.obs[s,t] ~ dexp(0.1)	#Prior for SD of observation process (variation in detectability)
+    for (s in 1:n.sites){### start loop over every study area
+      for (t in 1:T){### start loop over every year
+        sigma.obs[s,t] ~ dexp(0.1)#Prior for SD of observation process (variation in detectability)
         tau.obs[s,t]<-pow(sigma.obs[s,t],-2)
       }
     }
@@ -53,9 +53,9 @@ model {
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    for (gy in 1:2){    ## for good and poor monitoring years
-      mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
-      mean.p.ad[gy] ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
+    for (gy in 1:3){    ## for good and poor monitoring years
+      mean.p.juv[gy] ~ dunif(0, 1)           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
+      mean.p.ad[gy] ~ dunif(0, 1)           # Prior for mean adult recapture - should be higher than 20%
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
       mu.p.ad[gy] <- log(mean.p.ad[gy] / (1-mean.p.ad[gy])) # Logit transformation
     }
@@ -106,7 +106,7 @@ model {
     # -------------------------------------------------
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
-    ## ADJUSTED BASED ON PAST POPULATION SIZES WIT CHICK COUNTS SINCE 1999
+    ## ADJUSTED BASED ON PAST POPULATION SIZES WITH CHICK COUNTS SINCE 1999
     
     IM[1,1,1] ~ dnorm(324,20) T(0,)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003 - CAN BE MANIPULATED
     IM[1,1,2] <- 0
@@ -143,7 +143,7 @@ model {
     JUV[1] ~ dnorm(510,100) T(0,)          ### sum of chicks is 510
     N.atsea[1] ~ dnorm(530,20) T(0,)    ### unknown number - CAN BE MANIPULATED
     Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea - does not include recruits in Year 1
-    
+    breed.prop[1] <- Ntot.breed[1]/Ntot[1]
     
     ### FOR EVERY SUBSEQUENT YEAR POPULATION PROCESS
     
@@ -181,8 +181,9 @@ model {
     # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
     
     N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
-    N.breed.ready[tt] ~ dbin(p.ad[tt+24], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
-    Ntot.breed[tt]<- max((round(N.breed.ready[tt]+N.recruits[tt])),(R[tt]-50))              ### number of counted breeders is sum of old breeders returning and first recruits, cannot be much lower than count
+    breed.prop[tt] <- max(p.ad[tt+24],mean.p.ad[3])### p.ad is only equivalent to breeding propensity in years with high effort
+    N.breed.ready[tt] ~ dbin(breed.prop[tt], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
+    Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea[tt] <- round(N.ad.surv[tt]-(Ntot.breed[tt]-N.recruits[tt]))                     ### potential breeders that remain at sea    
     
     ### THE TOTAL TRAL POPULATION ###
@@ -198,14 +199,14 @@ model {
     # 2.2. Observation process for population counts: state-space model of annual counts
     # -------------------------------------------------
     
-    for (s in 1:n.sites){			### start loop over every study area
+    for (s in 1:n.sites){### start loop over every study area
     
       ## Observation process
     
       for (t in 1:T){
-        y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s,t])								# Distribution for random error in observed numbers (counts)
-      }														# run this loop over t= nyears
-    }		## end site loop
+        y.count[t,s] ~ dnorm(Ntot.breed[t]*prop.sites[s], tau.obs[s,t])# Distribution for random error in observed numbers (counts)
+      }# run this loop over t= nyears
+    }## end site loop
     
     
     # -------------------------------------------------        
@@ -214,7 +215,7 @@ model {
 
     for (t in 1:(T-1)){
       J[t] ~ dbin(ann.fec[t], R[t])
-    } #	close loop over every year in which we have fecundity data
+    } #close loop over every year in which we have fecundity data
     
     
     
@@ -269,7 +270,7 @@ model {
     ## DERIVED POPULATION GROWTH RATE PER YEAR
     for (t in 1:(T-1)){
       lambda[t]<-Ntot[t+1]/max(1,Ntot[t])  ## division by 0 creates invalid parent value
-    }		## end year loop
+    }## end year loop
     
     ## DERIVED MEAN FECUNDITY 
     mean.fec <- mean(ann.fec)

@@ -67,6 +67,7 @@
 
 ## 07 January 2022: re-run model to report IM, and fix Ntot.breed to never fall below actually counted value
 
+## 17 January 2022: revised model to 3 detection parameters and included a max for breed.prop
 
 library(tidyverse)
 library(lubridate)
@@ -214,6 +215,13 @@ fut.surv.change<- expand.grid(PROJECTION.years,dec.surv,lag.time) %>%
   
 
 
+#########################################################################
+# SPECIFY DETECTION PROBABILITY
+#########################################################################
+# use 3 rather than just 2 parameters, with higher probability after 2009
+goodyears$p.sel<-ifelse(goodyears$p.sel==2 & goodyears$Contact_Year>2008,3,goodyears$p.sel)
+
+
 
 #########################################################################
 # SPECIFY MODEL IN JAGS
@@ -275,7 +283,7 @@ model {
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    for (gy in 1:2){    ## for good and poor monitoring years
+    for (gy in 1:3){    ## for good and poor monitoring years
       mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
       mean.p.ad[gy] ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
@@ -328,7 +336,7 @@ model {
     # -------------------------------------------------
     
     ### INITIAL VALUES FOR COMPONENTS FOR YEAR 1 - based on deterministic multiplications
-    ## ADJUSTED BASED ON PAST POPULATION SIZES WIT CHICK COUNTS SINCE 1999
+    ## ADJUSTED BASED ON PAST POPULATION SIZES WITH CHICK COUNTS SINCE 1999
     
     IM[1,1,1] ~ dnorm(324,20) T(0,)                                 ### number of 1-year old survivors is low because few chicks hatched in 2003 - CAN BE MANIPULATED
     IM[1,1,2] <- 0
@@ -365,7 +373,7 @@ model {
     JUV[1] ~ dnorm(510,100) T(0,)          ### sum of chicks is 510
     N.atsea[1] ~ dnorm(530,20) T(0,)    ### unknown number - CAN BE MANIPULATED
     Ntot[1]<-sum(IM[1,,3]) + Ntot.breed[1]+N.atsea[1]  ## total population size is all the immatures plus adult breeders and adults at sea - does not include recruits in Year 1
-    
+    breed.prop[1] <- Ntot.breed[1]/Ntot[1]
     
     ### FOR EVERY SUBSEQUENT YEAR POPULATION PROCESS
     
@@ -403,8 +411,9 @@ model {
     # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
     
     N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
-    N.breed.ready[tt] ~ dbin(p.ad[tt+24], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
-    Ntot.breed[tt]<- max((round(N.breed.ready[tt]+N.recruits[tt])),(R[tt]-50))              ### number of counted breeders is sum of old breeders returning and first recruits, cannot be much lower than count
+    breed.prop[tt] <- max(p.ad[tt+24],mean.p.ad[3])						### p.ad is only equivalent to breeding propensity in years with high effort
+    N.breed.ready[tt] ~ dbin(breed.prop[tt], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
+    Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea[tt] <- round(N.ad.surv[tt]-(Ntot.breed[tt]-N.recruits[tt]))                     ### potential breeders that remain at sea    
     
     ### THE TOTAL TRAL POPULATION ###
@@ -648,8 +657,8 @@ jags.data <- list(marr.j = chick.marray,
 # Initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          mean.phi.juv = runif(1, 0.5, 0.9),
-                         mean.p.ad = runif(2, 0.2, 1),
-                         mean.p.juv = runif(2, 0, 1),
+                         mean.p.ad = runif(3, 0.2, 1),
+                         mean.p.juv = runif(3, 0, 1),
                          Ntot.breed= c(runif(1, 4950, 5050),rep(NA,n.years-1)),
                          JUV= c(rnorm(1, 246, 0.1),rep(NA,n.years-1)),
                          N.atsea= c(rnorm(1, 530, 0.1),rep(NA,n.years-1)),
@@ -669,18 +678,11 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
                 "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad","p.juv","p.ad",
-                "mean.p.sd","sigma.p","sigma.phi","IM","JUV") ## added IM and JUV to facilitate LTRE analysis
+                "mean.p.sd","sigma.p","sigma.phi") ## ,"IM","JUV"added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE
 rm(list=setdiff(ls(), c("parameters","jags.data","inits","n.years","n.sites")))
 gc()
-
-
-# MCMC settings
-ni <- 12500
-nt <- 10
-nb <- 25000
-nc <- 3
 
 
 
@@ -691,18 +693,18 @@ nc <- 3
 #                     n.chains = nc, n.thin = nt, n.burnin = nb,parallel=T, #n.iter = ni)
 #                     Rhat.limit=1.2, max.iter=200000)  
 
-nt <- 10
+nt <- 20
 nb <- 25000
-nad <- 2000
+nad <- 10000
 nc <- 3
-ns <- 200000 #longest
+ns <- 10000 #longest
 
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
                     model="C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_FINAL_REV2022.jags",
                     n.chains = nc, thin = nt, burnin = nb, adapt = nad,sample = ns, 
                     method = "rjparallel") 
 
-
+str(TRALipm)
 
 #########################################################################
 # SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
@@ -710,7 +712,7 @@ TRALipm <- run.jags(data=jags.data, inits=inits, parameters,
 ### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
 
 ## updated script for 'runjags' output
-summary_tralipm <- summary(TRALipm)
+summary_tralipm <- summary(TRALipm, vars=c("Ntot"))   ### does not run for all variables if IM is included
 summary_tralipm_df <- as.data.frame(summary_tralipm)
 View(summary_tralipm_df)
 head(summary_tralipm_df)
@@ -740,6 +742,6 @@ max(predictions$Rhat)
 
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_FINAL_REV2022.RData")
+save.image("TRAL_IPM_output_FINAL_LTRE.RData")
 
 
