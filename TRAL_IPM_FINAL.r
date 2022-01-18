@@ -588,9 +588,9 @@ model {
       ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.prev.succ.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round(N.succ.breed.f[scen,tt-1]))                  ### these birds will  remain at sea because tey bred successfully
-      N.breed.ready.f[scen,tt] ~ dbin(min(0.99,(mean.p.ad[2]/(1-mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of survivors that returns, with fecundity partialled out of return probability
+      N.breed.ready.f[scen,tt] ~ dbin(min(0.99,(mean.p.ad[2])), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of unsuccessful or non-breeding survivors that returns
       Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
-      N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because tey bred successfully
+      N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because they bred successfully
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt]+N.prev.succ.f[scen,tt])                     ### potential breeders that remain at sea    
     
       ### THE TOTAL TRAL POPULATION ###
@@ -673,12 +673,12 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
  
 
 # Parameters monitored
-parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
-                "mean.recruit","pop.growth.rate","fut.growth.rate","lambda",
+parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec",
+                "pop.growth.rate","fut.growth.rate","lambda",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
-                "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad","p.juv","p.ad",
-                "mean.p.sd","sigma.p","sigma.phi") ## ,"IM","JUV"added IM and JUV to facilitate LTRE analysis
+                "ann.fec", "mean.p.juv","mean.p.ad",#"p.juv","p.ad",
+                "IM") ## added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE
 rm(list=setdiff(ls(), c("parameters","jags.data","inits","n.years","n.sites")))
@@ -706,14 +706,52 @@ TRALipm <- run.jags(data=jags.data, inits=inits, parameters,
 
 str(TRALipm)
 
+
+
 #########################################################################
 # SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
 #########################################################################
 ### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
+### monitoring IM and JUV makes this workspace way too large to save
+### writing output files one by one
 
 ## updated script for 'runjags' output
-summary_tralipm <- summary(TRALipm, vars=c("Ntot"))   ### does not run for all variables if IM is included
-summary_tralipm_df <- as.data.frame(summary_tralipm)
+
+for(p in parameters){
+summary_tralipm <- summary(TRALipm, vars=p)   ### ("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity", "mean.recruit",)does not run for all variables if IM is included
+predictions <- data.frame(summary_tralipm,
+                          parameter = row.names(summary_tralipm))
+#summary_tralipm_df <- as.data.frame(summary_tralipm)
+fwrite(predictions, sprintf("IPM_output_%s.csv",p))
+}
+
+
+
+#### FOR IM the above does not work
+
+### need the following parameters from model
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,1]") # IM: 2210-3829
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[1,1,1]") 
+IM <- as.matrix(TRALipm$mcmc[[1]][,c(406:945)])    #### modify sequence of dimnames to only include ,,1] 
+
+### cannot include all chains as memory allocation error
+#for(ch in 2:nc){
+#   IM<-rbind(IM,as.matrix(TRALipm$mcmc[[ch]][,c(406:2025)]))  ## only for the years coinciding with the fecundity and pop size
+# }
+
+IMpredictions<-as_tibble(IM) %>% gather(key="parameter", value="value") %>%
+	group_by(parameter) %>%
+	summarise(mean=mean(value), median=median(value), lcl=quantile(value,0.025), ucl=quantile(value,0.975))
+fwrite(IMpredictions, sprintf("IPM_output_%s.csv",p))
+
+
+
+
+
+
+
+#### old code that worked before inclusion of IM and JUV - not possible with memory limitations
+
 View(summary_tralipm_df)
 head(summary_tralipm_df)
 min(summary_tralipm_df$SSeff) #Ntot[1]
@@ -742,6 +780,6 @@ max(predictions$Rhat)
 
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_FINAL_LTRE.RData")
+save.image("TRAL_IPM_output_FINAL_REV2022b.RData")
 
 
