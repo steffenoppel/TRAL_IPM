@@ -20,7 +20,7 @@ library(matrixStats)
 filter<-dplyr::filter
 select<-dplyr::select
 library(popbio)
-rm(list=ls())
+#rm(list=ls())
 
 
 ### instead of simulating vital rates, we extracted real data from IPM output of TRAL
@@ -35,6 +35,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 # which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[17]") # ann.fec: 236 - 253
 # which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]") # Ntot: 26-43
 # which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[1]") # Ntot.breed: 218-235
+# which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,3]") # IM: 2210-3829
 # 
 # 
 # Sa <- as.matrix(TRALipm$mcmc[[1]][,c(159:175)])
@@ -42,6 +43,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 # rho <- as.matrix(TRALipm$mcmc[[1]][,c(236:252)])
 # all <- as.matrix(TRALipm$mcmc[[1]][,c(26:43)])
 # br <- as.matrix(TRALipm$mcmc[[1]][,c(218:235)])
+# IM <- as.matrix(TRALipm$mcmc[[1]][,c(2210:3829)])
 # 
 # for(ch in 2:nc){
 #   Sa<-rbind(Sa,as.matrix(TRALipm$mcmc[[ch]][,c(159:175)]))  ## only for the years coinciding with the fecundity and pop size
@@ -51,7 +53,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #   br<-rbind(br,as.matrix(TRALipm$mcmc[[ch]][,c(218:235)]))  ## only for the years coinciding with the fecundity and pop size
 # }
 # nb=all-br
-# rm(list= ls()[!(ls() %in% c('Sa','Sj','rho','all','br','nb','matrix.elements','gr','sensrho','sensSj','sensSa','sensnb','sensbr'))])
+# rm(list= ls()[!(ls() %in% c('Sa','Sj','rho','all','br','nb','IM','matrix.elements','gr','sensrho','sensSj','sensSa','sensnb','sensbr'))])
 # save.image("TRAL_LTRE_input.RData")
 load("TRAL_LTRE_input.RData")
 input<-data.frame(Year=seq(2004:2021),Sa=c(Sa[1,],NA), Sj=c(Sj[1,],NA),Fec=c(rho[1,],NA),n.breed=br[1,],n.nonbreed=nb[1,])
