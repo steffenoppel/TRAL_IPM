@@ -14,6 +14,10 @@
 
 ## 22 December 2021: re-ran data preparation with 2021 breeding success data included
 
+## 17 January 2022: noticed lack of adult records in 2005,2007,and 2008 - tried to populate from nest attendant records from breeding database
+
+
+
 library(tidyverse)
 library(lubridate)
 library(data.table)
@@ -45,6 +49,26 @@ load("GOUGH_seabird_CMR_data.RData")
 system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_count_import.r")), wait = TRUE, invisible = FALSE, intern = T)
 try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
 load("GOUGH_seabird_data.RData")
+
+## run the RODBC import of nest attendants data in a 32-bit version of R
+## MUST CHANGE QUERY TO REMOVE YEAR FILTER FIRST
+system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database\\RODBC_import_partners.r")), wait = TRUE, invisible = FALSE, intern = T)
+try(setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\DATA\\Breeding_Database"), silent=T)
+load("NEST_PARTNER_DATA.RData")
+nestcontacts<-TRAL %>% filter(Year %in% c(2007,2008)) %>%
+  mutate(BirdID=bands$BirdID[match(MetalRing,bands$Band_Number)])
+### NEED TO CORRECT THESE IN DATABASE
+nestcontacts %>% filter (is.na(BirdID))
+
+addcontacts<-nestcontacts %>% filter(!is.na(BirdID)) %>%
+  rename(Contact_Year=Year,Date_Time=Date, Nest_Description=Nest_label,SpeciesCode=Species) %>%
+  mutate(Breeding_StatusID=ifelse(is.na(DarvicCode),NA,1899636611)) %>%
+  mutate(Age=ifelse(is.na(DarvicCode),"Chick","Adult")) %>%
+  mutate(ContactID="XXX9999",Location="Gonydale",Contact_Season="XXX") %>%
+  select(ContactID,SpeciesCode,BirdID,Contact_Year,Contact_Season,Date_Time,Age,Sex,Nest_Description,Location,Breeding_StatusID)
+contacts<-bind_rows(contacts,addcontacts)
+rm(TRAL,AYNA,nestvisits,nestcontacts,addcontacts)
+
 
 ## filter data for the selected species
 nests<-nests %>% filter(Species==SP)
@@ -266,7 +290,7 @@ contacts<-contacts %>%
 contacts %>% filter(is.na(AGE))
 contacts %>% filter(is.na(ContAge))
 
-
+contacts %>% filter(Contact_Year==2005) %>% filter(ContAge>1)
 
 
 ################################################################################################
@@ -288,6 +312,15 @@ dim(contacts)
 dim(fixed_contacts)
 length(unique(fixed_contacts$BirdID))
 length(allbirds)
+
+### FIND CONTACTS OF BIRDS RECORDED INSIDE AND OUTSIDE OF STUDY AREAS
+outsiders<-fixed_contacts %>% group_by(BirdID) %>%
+  summarise(swap=min(INSIDE)) %>%
+  filter(swap==0) %>%
+  left_join(deploy_age, by="BirdID") %>%
+  arrange(FIRST_YEAR)
+outsiders %>% group_by(FIRST_AGE,FIRST_YEAR) %>% summarise(N=length(unique(BirdID))) %>% print(n=30)
+fixed_contacts %>% filter(BirdID %in% outsiders$BirdID) %>% select(BirdID,Contact_Year,ContAge,Location)
 
 
 ### CHECK WHAT BIRDS WERE RINGED AS CHICKS BEFORE 1978
@@ -660,4 +693,4 @@ TRAL.pop %>% ungroup() %>%
 ##   11. SAVE WORKSPACE ###############
 #############################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_input.marray.REV2021.RData")
+save.image("TRAL_IPM_input.marray.REV2022.RData")
