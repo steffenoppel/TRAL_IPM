@@ -677,7 +677,7 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec",
                 "pop.growth.rate","fut.growth.rate","lambda",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
-                "ann.fec", "mean.p.juv","mean.p.ad",#"p.juv","p.ad",
+                "ann.fec", "mean.p.juv","mean.p.ad","p.ad",#"p.juv",
                 "IM") ## added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE
@@ -751,7 +751,9 @@ fwrite(IMpredictions, sprintf("IPM_output_%s.csv",p))
 
 
 #### old code that worked before inclusion of IM and JUV - not possible with memory limitations
-
+summary_tralipm <- summary(TRALipm, vars=c("Ntot","Ntot.breed","ann.fec","phi.ad","phi.juv","pop.growth.rate","fut.growth.rate")) 
+summary_tralipm_df<-data.frame(summary_tralipm,
+           parameter = row.names(summary_tralipm))
 View(summary_tralipm_df)
 head(summary_tralipm_df)
 min(summary_tralipm_df$SSeff) #Ntot[1]
