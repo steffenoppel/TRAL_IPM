@@ -10,11 +10,12 @@ select<-dplyr::select
 
 ### for most parameters the years are in separate rows
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-parameters <- c("Ntot","Ntot.breed","ann.fec","phi.ad","phi.juv","p.ad") ## added IM and JUV to facilitate LTRE analysis
+parameters <- c("Ntot","Ntot.breed","ann.fec","phi.ad","phi.juv","p.ad","breed.prop") ## added IM and JUV to facilitate LTRE analysis
+selrows<-list(seq(1,17,1),seq(1,17,1),seq(1,17,1),seq(27,43,1),seq(27,43,1),seq(29,45,1),seq(1,17,1))
 LTRE_input<-data.frame(Year=seq(2004,2020,1))
 for(p in 1:length(parameters)){
   input<-fread(sprintf("IPM_output_%s.csv",parameters[p]))
-  LTRE_input[,p+1]<-input$Median[1:17]
+  LTRE_input[,p+1]<-input$Median[selrows[[p]]]
   names(LTRE_input)[p+1]<-parameters[p]
   fwrite(LTRE_input, "LTRE_input_extended.csv")
 }
