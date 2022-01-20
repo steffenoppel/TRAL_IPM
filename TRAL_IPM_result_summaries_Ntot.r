@@ -43,7 +43,8 @@ library(magick)
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
-load("TRAL_IPM_output_FINAL_REV2021.RData")
+#load("TRAL_IPM_output_FINAL_REV2021.RData")
+load("TRAL_IPM_output_REV2022decline.RData")
 imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
 TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
@@ -56,19 +57,26 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 predictions <- data.frame(summary(addsummary_tralipm),
                           parameter = row.names(summary(addsummary_tralipm)))
 row.names(predictions) <- 1:nrow(predictions)
-predictions <- predictions[1:253,]
+predictions <- predictions[1:319,]
+
+predictions$parameter
 
 ## write output into file ##
 export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
-  filter(!grepl("Ntot.breed",parameter)) %>%
-  #filter(!grepl("agebeta",parameter)) %>%
+  #filter(!grepl("Ntot.breed",parameter)) %>%
+  filter(!grepl("agebeta",parameter)) %>%
   mutate(Year=c(
-    rep(NA,8),         ## for mean phi, p, and growth rates
+    rep(NA,3),         ## for mean phi and fec
+    seq(2004,2021,1),   ## for breed.prop
+    rep(NA,4),         ## for growth rates
     seq(2004,2021,1),   ## for N.tot
     rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
     #seq(2004,2020,1), ##  for lambda 
     rep(seq(1979,2020,1), 2), ##  for phi.ad and phi.juv
-    seq(2004,2021,1)   ## for ann.fec
+    seq(2004,2021,1),   ## for Ntot.breed
+    seq(2004,2021,1),   ## for ann.fec
+    rep(NA,6),         ## for mean p
+    seq(1979,2020,1) ##  for p.ad
   )) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
@@ -82,7 +90,7 @@ tail(export)
 hist(export$Rhat)
 hist(export$SSeff)
 
-#write.table(export,"TRAL_Gough_IPM_estimates_2021_FINAL.csv", sep=",", row.names=F)
+#write.table(export,"TRAL_Gough_IPM_estimates_2022decline.csv", sep=",", row.names=F)
 
 
 
@@ -123,7 +131,7 @@ TABLE1<-export %>%
                           "mean.phi.ad",
                           "mean.phi.juv" )) 
 
-#write.table(TABLE1,"TRAL_demographic_estimates_2021.csv", sep=",", row.names=F)
+#write.table(TABLE1,"TRAL_demographic_estimates_2022decline.csv", sep=",", row.names=F)
 
 
 
@@ -143,6 +151,7 @@ TABLE1<-export %>%
 plot1_df <- export %>%
   rename(lcl=Lower95,ucl=Upper95) %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
+  filter(!grepl("Ntot.breed",parameter)) %>%
   arrange(Year) %>%
   mutate(Scenario="past, and no future change") %>%
   mutate(Scenario=if_else(grepl("f\\[2",parameter,perl=T,ignore.case = T), "after successful mouse eradication",if_else(grepl("f\\[3",parameter,perl=T,ignore.case = T),"unsuccessful mouse eradication and worsening impacts",Scenario))) %>%
@@ -152,7 +161,8 @@ plot1_df <- export %>%
 
 
 ## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-TRAL.pop$line="observed trend"
+
+TRAL.pop<-data.frame(Year=seq(2004,2021,1),tot=jags.data$R,line="observed trend")
 ggplot(plot1_df) + 
   geom_line(aes(y=Median*2, x=Year, colour=Scenario), size=1)+   #
   geom_ribbon(aes(x=Year, ymin=lcl*2,ymax=ucl*2, fill=Scenario),alpha=0.3)+ #
@@ -164,6 +174,7 @@ ggplot(plot1_df) +
   ## add the breeding pair count data
   geom_point(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year),col="black", size=2.5)+
   geom_smooth(data=TRAL.pop[TRAL.pop$tot>500 & TRAL.pop$tot<2395,],aes(y=tot*2, x=Year, lty=line),method="lm",se=T,col="grey12", size=1)+
+
   #ylab() +
   #xlab("Year") +
   #geom_vline(aes(xintercept = 2022), colour="gray15", linetype = "dashed", size=1) +
