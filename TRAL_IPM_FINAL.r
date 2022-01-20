@@ -411,7 +411,7 @@ model {
     # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
     
     N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
-    breed.prop[tt] <- max(p.ad[tt+24],mean.p.ad[3])						### p.ad is only equivalent to breeding propensity in years with high effort
+    breed.prop[tt] <- max(p.ad[tt+24],0.25)						### p.ad is only equivalent to breeding propensity in years with high effort
     N.breed.ready[tt] ~ dbin(breed.prop[tt], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
     Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea[tt] <- round(N.ad.surv[tt]-(Ntot.breed[tt]-N.recruits[tt]))                     ### potential breeders that remain at sea    
@@ -548,7 +548,7 @@ model {
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
     
     N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))              ### previous year's adults that survive
-    N.breed.ready.f[scen,1] ~ dbin(min(0.99,mean.p.ad[3]), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
+    N.breed.ready.f[scen,1] ~ dbin(max(0.25,mean.p.ad[3]-mean.fec), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
     Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])            ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])               ### potential breeders that remain at sea
     N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because they bred successfully
@@ -723,12 +723,12 @@ fwrite(predictions, sprintf("IPM_output_%s.csv",p))
 ### need the following parameters from model
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,1]") # IM: 2210-3829
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[1,1,1]") 
-IM <- as.matrix(TRALipm$mcmc[[1]][,c(302:841)])    #### modify sequence of dimnames to only include ,,1] 
+IM <- as.matrix(TRALipm$mcmc[[1]][,c(320:859)])    #### modify sequence of dimnames to only include ,,1] 
 
 ### cannot include all chains as memory allocation error
-#for(ch in 2:nc){
-#   IM<-rbind(IM,as.matrix(TRALipm$mcmc[[ch]][,c(406:2025)]))  ## only for the years coinciding with the fecundity and pop size
-# }
+for(ch in 2:nc){
+   IM<-rbind(IM,as.matrix(TRALipm$mcmc[[ch]][,c(320:859)]))  ## only for the years coinciding with the fecundity and pop size
+ }
 
 IMpredictions<-as_tibble(IM) %>% gather(key="parameter", value="value") %>%
 	group_by(parameter) %>%
