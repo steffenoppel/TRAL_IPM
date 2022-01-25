@@ -88,7 +88,7 @@ select<-dplyr::select
 
 ## LOAD PREPARED M-ARRAY FOR SURVIVAL ESTIMATION
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-load("TRAL_IPM_input.marray.REV2021.RData")
+load("TRAL_IPM_input.marray.REV2022.RData")
 
 ## BOTH ARRAYS MUST HAVE EXACT SAME DIMENSIONS
 dim(chick.marray)
@@ -219,9 +219,11 @@ fut.surv.change<- expand.grid(PROJECTION.years,dec.surv,lag.time) %>%
 # SPECIFY DETECTION PROBABILITY
 #########################################################################
 # use 3 rather than just 2 parameters, with higher probability after 2009
-goodyears$p.sel<-ifelse(goodyears$p.sel==2 & goodyears$Contact_Year>2008,3,goodyears$p.sel)
-
-
+# abandoned this approach on 24 Jan 2022 because survival estimates are wonky
+#goodyears$p.sel<-ifelse(goodyears$p.sel==2 & goodyears$Contact_Year>2008,3,goodyears$p.sel)
+goodyears$p.sel<-ifelse(goodyears$p.sel==3,2,goodyears$p.sel)
+goodyears$bycatch<-ifelse(goodyears$Contact_Year<2006,2,1)
+goodyears$p.sel<-ifelse(goodyears$Contact_Year<2004,1,ifelse(goodyears$Contact_Year==2001,1,2)) ### re-calibrated which year has good and poor coverage
 
 #########################################################################
 # SPECIFY MODEL IN JAGS
@@ -251,6 +253,7 @@ model {
     # - marray_age_recruit allows for varying juvenile recapture probability with age.
     # - marray_age_recruit_immat creates a loop over immature age classes rather than specify each age separately
     # - marray_age_recruit_immat_2008 sets juv surv to mean and starts in 2008 rather than 2004
+    # - rev2022 includes survival data up to 2022, but projection still starts in 2021
     # -------------------------------------------------
     
 #-------------------------------------------------  
@@ -283,7 +286,7 @@ model {
     # -------------------------------------------------
     
     ### RECAPTURE PROBABILITY
-    for (gy in 1:3){    ## for good and poor monitoring years
+    for (gy in 1:2){    ## for good and poor monitoring years
       mean.p.juv[gy] ~ dunif(0, 1)	           # Prior for mean juvenile recapture - should be higher than 20% if they survive!
       mean.p.ad[gy] ~ dunif(0, 1)	           # Prior for mean adult recapture - should be higher than 20%
       mu.p.juv[gy] <- log(mean.p.juv[gy] / (1-mean.p.juv[gy])) # Logit transformation
@@ -411,7 +414,7 @@ model {
     # simplified in simplified_v2 to just adult survivors with p.ad as proportion returning
     
     N.ad.surv[tt] ~ dbin(phi.ad[tt+24], round(Ntot.breed[tt-1]+N.atsea[tt-1]))           ### previous year's adults that survive
-    breed.prop[tt] <- max(p.ad[tt+24],0.25)						### p.ad is only equivalent to breeding propensity in years with high effort
+    breed.prop[tt] <- max(p.ad[tt+24],0.35)						### p.ad is only equivalent to breeding propensity in years with high effort
     N.breed.ready[tt] ~ dbin(breed.prop[tt], N.ad.surv[tt])                  ### number of available breeders is proportion of survivors that returns
     Ntot.breed[tt]<- round(N.breed.ready[tt]+N.recruits[tt])              ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea[tt] <- round(N.ad.surv[tt]-(Ntot.breed[tt]-N.recruits[tt]))                     ### potential breeders that remain at sea    
@@ -548,7 +551,7 @@ model {
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
     
     N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))              ### previous year's adults that survive
-    N.breed.ready.f[scen,1] ~ dbin(max(0.25,mean.p.ad[3]-mean.fec), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
+    N.breed.ready.f[scen,1] ~ dbin(min(0.95,(mean.p.ad[2]/(1-fut.fec.change[scen]*mean.fec))), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
     Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])            ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])               ### potential breeders that remain at sea
     N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because they bred successfully
@@ -588,7 +591,7 @@ model {
       ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.prev.succ.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round(N.succ.breed.f[scen,tt-1]))                  ### these birds will  remain at sea because tey bred successfully
-      N.breed.ready.f[scen,tt] ~ dbin(max(0.25,(mean.p.ad[3]-mean.fec)), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of unsuccessful or non-breeding survivors that returns, subtracting breeding success from return probability in best monitoring years
+      N.breed.ready.f[scen,tt] ~ dbin(min(0.95,(mean.p.ad[2]/(1-fut.fec.change[scen]*mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of unsuccessful or non-breeding survivors that returns, subtracting breeding success from return probability in best monitoring years
       Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
       N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because they bred successfully
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt]+N.prev.succ.f[scen,tt])                     ### potential breeders that remain at sea    
@@ -657,8 +660,8 @@ jags.data <- list(marr.j = chick.marray,
 # Initial values 
 inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
                          mean.phi.juv = runif(1, 0.5, 0.9),
-                         mean.p.ad = runif(3, 0.2, 1),
-                         mean.p.juv = runif(3, 0, 1),
+                         mean.p.ad = runif(2, 0.2, 1),
+                         mean.p.juv = runif(2, 0, 1),
                          Ntot.breed= c(runif(1, 4950, 5050),rep(NA,n.years-1)),
                          JUV= c(rnorm(1, 246, 0.1),rep(NA,n.years-1)),
                          N.atsea= c(rnorm(1, 530, 0.1),rep(NA,n.years-1)),
