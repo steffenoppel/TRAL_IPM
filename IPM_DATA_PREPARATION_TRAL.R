@@ -271,8 +271,8 @@ dim(MISSAGE)
 contacts<-contacts %>%
   mutate(Contact_Year=if_else(is.na(Contact_Year),as.integer(year(Date_Time)),Contact_Year)) %>%
   mutate(Contact_Year=if_else(as.integer(month(Date_Time))==12 & !(Age %in% c("Chick","Fledgling")),Contact_Year+1,as.numeric(Contact_Year))) %>%
-  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==1 & (Age %in% c("Chick","Fledgling")),Contact_Year-1,as.numeric(Contact_Year))) %>%
-  filter(Contact_Year<2022) 
+  mutate(Contact_Year=if_else(as.integer(month(Date_Time))==1 & (Age %in% c("Chick","Fledgling")),Contact_Year-1,as.numeric(Contact_Year))) #%>%
+  #filter(Contact_Year<2022) 
 dim(contacts)
 dim(contacts)
 head(contacts)
@@ -290,7 +290,7 @@ contacts<-contacts %>%
 contacts %>% filter(is.na(AGE))
 contacts %>% filter(is.na(ContAge))
 
-contacts %>% filter(Contact_Year==2005) %>% filter(ContAge>1)
+contacts %>% filter(Contact_Year==2007) %>% filter(ContAge>1)
 
 
 ################################################################################################
@@ -356,9 +356,10 @@ n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
   spread(key=FIRST_AGE, value=N_marked, fill=0) %>%
   ungroup() %>%
   mutate(N_marked=Adult+Chick) %>%
-  mutate(N_all = cumsum(N_marked))
-  #bind_rows(tibble(Contact_Year=2021,N_marked=0,N_all=0)) %>%
-  #mutate(N_all=if_else(Contact_Year==2021,dplyr::lag(N_all),N_all))
+  mutate(N_all = cumsum(N_marked)) %>%
+  bind_rows(tibble(Contact_Year=2022,Adult=0,Chick=0,N_marked=0,N_all=0)) %>%
+  mutate(N_all=if_else(Contact_Year==2022,dplyr::lag(N_all),N_all)) %>%
+  arrange(Contact_Year)  
 n_exist$N_all[1] = n_exist$N_marked[1]
 n_exist$N_all[2] = (n_exist$Adult[1]*0.96) + (n_exist$Chick[1]*0.85) + n_exist$N_marked[2]
 n_exist$N_all[3] = (n_exist$N_all[2]*(0.96^19)) + n_exist$N_marked[3]
@@ -369,15 +370,19 @@ for (y in 5:dim(n_exist)[1]) {
 tail(n_exist)
 
 
-goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
+goodyears<-contacts %>% group_by(Contact_Year) %>% summarise(n=length(unique(BirdID))) %>%
   left_join(n_exist, by='Contact_Year') %>%
   mutate(prop.seen=n/N_all) %>%
-  mutate(p.sel=if_else(prop.seen>0.1,2,1))
+  mutate(recap_effort=n-N_marked) %>%
+  mutate(p.sel=if_else(prop.seen<0.1,1,if_else(prop.seen<0.25,2,3))) %>%
+  mutate(p.sel.tot=if_else(n<250,1,if_else(n<750,2,3)))
 tail(goodyears)
 
-ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.03)
+ggplot(goodyears) + geom_histogram(aes(x=prop.seen), binwidth=0.01)
+ggplot(goodyears) + geom_histogram(aes(x=n), binwidth=50)
 
-goodyears %>% mutate(Effort=if_else(prop.seen<0.15,"low","high")) %>%
+goodyears %>% mutate(Effort=if_else(prop.seen<0.10,"low",if_else(prop.seen<0.25,"medium","high"))) %>%
+#goodyears %>% mutate(Effort=if_else(n<250,"low",if_else(n<750,"medium","high"))) %>%
 ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity") + 
   
   labs(x = "Year",
