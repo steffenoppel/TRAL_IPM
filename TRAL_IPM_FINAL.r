@@ -551,7 +551,7 @@ model {
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
     
     N.ad.surv.f[scen,1] ~ dbin(mean.phi.ad, round(Ntot.breed[T]+N.atsea[T]))              ### previous year's adults that survive
-    N.breed.ready.f[scen,1] ~ dbin(min(0.95,(mean.p.ad[2]/(1-fut.fec.change[scen]*mean.fec))), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
+    N.breed.ready.f[scen,1] ~ dbin(min(0.95,(mean.p.ad[2]/(1-mean.fec))), round(N.ad.surv.f[scen,1]))              ### number of available breeders is proportion of survivors that returns, with fecundity INCLUDED in return probability
     Ntot.breed.f[scen,1]<- round(N.breed.ready.f[scen,1]+N.recruits.f[scen,1])            ### number of counted breeders is sum of old breeders returning and first recruits
     N.atsea.f[scen,1] <- round(N.ad.surv.f[scen,1]-N.breed.ready.f[scen,1])               ### potential breeders that remain at sea
     N.succ.breed.f[scen,1] ~ dbin(mean.fec, round(Ntot.breed.f[scen,1]))                  ### these birds will  remain at sea because they bred successfully
@@ -591,7 +591,7 @@ model {
       ## THE BREEDING POPULATION ##
       N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
       N.prev.succ.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round(N.succ.breed.f[scen,tt-1]))                  ### these birds will  remain at sea because tey bred successfully
-      N.breed.ready.f[scen,tt] ~ dbin(min(0.95,(mean.p.ad[2]/(1-fut.fec.change[scen]*mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of unsuccessful or non-breeding survivors that returns, subtracting breeding success from return probability in best monitoring years
+      N.breed.ready.f[scen,tt] ~ dbin(min(0.95,(mean.p.ad[2]/(1-mean.fec))), max(1,round(N.ad.surv.f[scen,tt])))                  ### number of available breeders is proportion of unsuccessful or non-breeding survivors that returns, subtracting breeding success from return probability in best monitoring years
       Ntot.breed.f[scen,tt]<- min(carr.capacity[scen,tt],round(N.breed.ready.f[scen,tt]+N.recruits.f[scen,tt]))              ### number of counted breeders is sum of old breeders returning and first recruits
       N.succ.breed.f[scen,tt] ~ dbin(fut.fec.change[scen]*mean.fec, round(Ntot.breed.f[scen,tt]))                  ### these birds will  remain at sea because they bred successfully
       N.atsea.f[scen,tt] <- round(N.ad.surv.f[scen,tt]-N.breed.ready.f[scen,tt]+N.prev.succ.f[scen,tt])                     ### potential breeders that remain at sea    
@@ -687,11 +687,11 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","breed.prop",
 rm(list=setdiff(ls(), c("parameters","jags.data","inits","n.years","n.sites")))
 gc()
 
-nt <- 20
+nt <- 10
 nb <- 25000
-nad <- 10000
+nad <- 20000
 nc <- 3
-ns <- 10000 #longest
+ns <- 50000 #longest
 
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
                     model="C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_FINAL_REV2022.jags",
@@ -750,8 +750,8 @@ summary_tralipm_df<-data.frame(summary_tralipm,
            parameter = row.names(summary_tralipm))
 View(summary_tralipm_df)
 head(summary_tralipm_df)
-min(summary_tralipm_df$SSeff) #Ntot[1]
-max(summary_tralipm_df$psrf) #Ntot[1]
+min(summary_tralipm_df$SSeff, na.rm=T) #Ntot[1]
+max(summary_tralipm_df$psrf, na.rm=T) #Ntot[1]
 
 addsummary_tralipm <- add.summary(TRALipm,plots = runjags.getOption("predraw.plots"))
 addsummary_tralipm #18 min
@@ -777,6 +777,6 @@ max(predictions$Rhat)
 
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_REV2022decline.RData")
+save.image("TRAL_IPM_output_REV2022.RData")
 
 

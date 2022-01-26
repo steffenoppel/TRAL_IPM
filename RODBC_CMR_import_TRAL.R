@@ -16,6 +16,7 @@ contactsbreed<- sqlQuery(db, "SELECT * FROM EXPORT_TRAL_contacts_breeding_status
 metalside<- sqlQuery(db, "SELECT * FROM qry_loc_of_metal_ring")
 ages<- sqlQuery(db, "SELECT * FROM Deployment_Age_BirdID")
 bands<-sqlQuery(db, "SELECT * FROM qry_federal_ring_per_BirdID")
+darvics<-sqlQuery(db, "SELECT * FROM qry_darvic_per_BirdID")
 odbcClose(db)
 
 #try(setwd("S:\\ConSci\\DptShare\\SteffenOppel\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM"), silent=T)
