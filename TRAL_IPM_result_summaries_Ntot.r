@@ -524,6 +524,99 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig2rev.jpg", width=14, h
 
 
 
+############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
+
+## # Step 1: Using the JAGS output (named TRALipm$mcmc),         # compute realized population growth rates for Tristan Albatross 
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[1]") # lambda: 26-42
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[43]") # phi.ad: 177-194
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.juv[43]") # phi.juv: 220-237
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[1]") # ann.fec: 256 - 273
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="breed.prop[18]") # breed.prop: 4-21
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[18]") # Ntot.breed: 238-255
+library(matrixStats)
+lam <- as.matrix(TRALipm$mcmc[[1]][,c(26:42)])
+Sa <- as.matrix(TRALipm$mcmc[[1]][,c(177:194)])
+Sj <- as.matrix(TRALipm$mcmc[[1]][,c(220:237)])
+Fec <- as.matrix(TRALipm$mcmc[[1]][,c(256:273)])
+Bp <- as.matrix(TRALipm$mcmc[[1]][,c(238:255)])
+breed.prop <- as.matrix(TRALipm$mcmc[[1]][,c(4:21)])
+
+
+# Account for different start of time series for survival and fecundity data
+for(ch in 2:nc){
+  lam<-rbind(lam,as.matrix(TRALipm$mcmc[[ch]][,c(26:42)]))
+  Sa<-rbind(Sa,as.matrix(TRALipm$mcmc[[ch]][,c(177:194)]))  ## only for the years coinciding with the fecundity and pop size
+  Sj<-rbind(Sj,as.matrix(TRALipm$mcmc[[ch]][,c(220:237)]))  ## only for the years coinciding with the fecundity and pop size
+  Fec<-rbind(Fec,as.matrix(TRALipm$mcmc[[ch]][,c(256:273)]))  ## without the last year for which no lambda is available
+  Bp<-rbind(Bp,as.matrix(TRALipm$mcmc[[ch]][,c(238:255)]))  ## only for the years coinciding with the fecundity and pop size
+  breed.prop<-rbind(breed.prop,as.matrix(TRALipm$mcmc[[ch]][,c(4:21)]))  ## only for the years coinciding with the fecundity and pop size
+}
+
+
+dim(lam)
+corplot.l<-data.frame(lambda=colMeans(lam),lcl.lam=apply(lam,2,quantile,probs = 0.025, na.rm = TRUE),ucl.lam=apply(lam,2,quantile,probs = 0.975, na.rm = TRUE),Year=c(2004:2020))
+corplot.f<-data.frame(parm=dimnames(Fec)[[2]],value=colMeans(Fec),Year=c(2004:2021),dem="Breeding success",lcl=apply(Fec,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Fec,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sa<-data.frame(parm=dimnames(Sa)[[2]],value=colMeans(Sa),Year=c(2004:2021),dem="Adult survival",lcl=apply(Sa,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sa,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Sj<-data.frame(parm=dimnames(Sj)[[2]],value=colMeans(Sj),Year=c(2004:2021),dem="Juvenile survival",lcl=apply(Sj,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sj,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.Bp<-data.frame(parm=dimnames(Bp)[[2]],value=colMeans(Bp),Year=c(2004:2021),dem="N breeding pairs",lcl=apply(Bp,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Bp,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.breed.prop<-data.frame(parm=dimnames(breed.prop)[[2]],value=colMeans(breed.prop),Year=c(2004:2021),dem="Breeding propensity",lcl=apply(breed.prop,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(breed.prop,2,quantile,probs = 0.975, na.rm = TRUE))
+
+
+corplot<-bind_rows(corplot.f,corplot.Sa,corplot.Sj,corplot.Bp,corplot.breed.prop) %>% filter(Year<2021) %>%
+  left_join(corplot.l, by="Year")
+
+### Pearson correlation tests
+test.vals<-corplot %>% filter(dem!="Breeding propensity") %>% group_by(dem) %>% summarise(x=min(lcl)) %>% mutate(text=NA)
+ct.f<-cor.test(corplot.l$lambda,corplot.f$value[1:17])
+test.vals$text[2]<-paste("r = ",round(ct.f$estimate,2)," (",round(ct.f$conf.int[1],2),", ",round(ct.f$conf.int[2],2),")", sep="")
+
+ct.Sa<-cor.test(corplot.l$lambda,corplot.Sa$value[1:17])
+test.vals$text[1]<-paste("r = ",round(ct.Sa$estimate,2)," (",round(ct.Sa$conf.int[1],2),", ",round(ct.Sa$conf.int[2],2),")", sep="")
+
+ct.Sj<-cor.test(corplot.l$lambda,corplot.Sj$value[1:17])
+test.vals$text[3]<-paste("r = ",round(ct.Sj$estimate,2)," (",round(ct.Sj$conf.int[1],2),", ",round(ct.Sj$conf.int[2],2),")", sep="")
+
+ct.Bp<-cor.test(corplot.l$lambda,corplot.Bp$value[corplot.Bp$Year<2021])
+test.vals$text[4]<-paste("r = ",round(ct.Bp$estimate,2)," (",round(ct.Bp$conf.int[1],2),", ",round(ct.Bp$conf.int[2],2),")", sep="")
+
+ct.breed.prop<-cor.test(corplot.l$lambda,corplot.breed.prop$value[corplot.breed.prop$Year<2021])
+#test.vals$text[5]<-paste("r = ",round(ct.breed.prop$estimate,2)," (",round(ct.breed.prop$conf.int[1],2),", ",round(ct.breed.prop$conf.int[2],2),")", sep="")
+
+
+## create PLOT
+corplot %>% filter(dem!="Breeding propensity") %>%
+ggplot() + geom_point(aes(y=lambda,x=value)) +
+  facet_wrap(~dem, scales="free_x") +
+  geom_errorbarh(aes(y=lambda,xmin=lcl,xmax=ucl), color='grey85') +
+  geom_errorbar(aes(x=value,ymin=lcl.lam,ymax=ucl.lam), color='grey85') +
+  geom_point(aes(y=lambda,x=value)) +
+  #geom_smooth(aes(x=lambda,y=value), method="lm") +
+  geom_hline(aes(yintercept = 1), colour="darkred", size=1, linetype = "dashed") +
+  #geom_abline(slope=1,colour="grey85", linetype = "dashed", size=1) +
+  geom_point(aes(y=lambda,x=value)) +
+  geom_text(data=test.vals,aes(y = 1.10, x = x, label = text), hjust=0, vjust = 1, size=3) +
+  
+  ylab("Annual population growth rate") +
+  xlab("Demographic parameter value") +
+  scale_y_continuous(breaks=seq(0.8,1.1,0.1), limits=c(0.75,1.11))+
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=14, color="black"),
+        strip.text=element_text(size=16, color="black"),
+        strip.background=element_rect(fill="white", colour="black"),
+        #axis.text.x=element_text(size=12, color="black", angle=45, vjust = 1, hjust=1), 
+        axis.title=element_text(size=16), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank())
+
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS4.jpg", width=9, height=8)
+
+
+
+
+
+
 
 
 
