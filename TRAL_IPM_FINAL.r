@@ -691,7 +691,7 @@ nt <- 10
 nb <- 25000
 nad <- 20000
 nc <- 3
-ns <- 50000 #longest
+ns <- 200000 #longest
 
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
                     model="C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\TRAL_IPM_FINAL_REV2022.jags",
@@ -755,7 +755,7 @@ max(summary_tralipm_df$psrf, na.rm=T) #Ntot[1]
 
 addsummary_tralipm <- add.summary(TRALipm,plots = runjags.getOption("predraw.plots"))
 addsummary_tralipm #18 min
-
+dim(addsummary_tralipm)
 plot(addsummary_tralipm, layout=c(2,2))
 
 predictions <- data.frame(summary(addsummary_tralipm),
@@ -772,11 +772,22 @@ predictions$Mode <- NULL
 np <- names(predictions) 
 names(predictions) <- c("lcl",np[2],"ucl",np[4:9],"Rhat",np[11])
 
-max(predictions$Rhat)
+max(predictions$Rhat, na.rm=T)
+predictions$parameter
+ls()
+size = 0
+for (x in ls() ){
+    thisSize = object.size(get(x))
+    size = size + thisSize
+    message(x, " = ", appendLF = F); print(thisSize, units='auto')
+}
+message("total workspace is ",appendLF = F); print(size, units='auto')
 
+rm(addsummary_tralipm,IM)
+gc()
 
-
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_REV2022.RData")
+save.image("TRAL_IPM_output_REV2022_FINAL.RData")
+setwd("G:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+save.image("TRAL_IPM_output_REV2022_FINAL.RData")
 
 
