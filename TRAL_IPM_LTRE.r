@@ -22,7 +22,7 @@ select<-dplyr::select
 #########################################################################
 
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-load("TRAL_IPM_output_FINAL_REV2021.RData")
+load("TRAL_IPM_output_REV2022_FINAL.RData")
 ls()
 
 
