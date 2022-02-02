@@ -190,7 +190,7 @@ ggplot(plot1_df) +
   scale_y_continuous(breaks=seq(0,18000,2000), limits=c(0,20000),expand = c(0, 0))+
   scale_x_continuous(breaks=seq(2005,2050,5), limits=c(2004,2050))+
   #scale_linetype_manual(name="Breeding population",label="observed trend") +
-  labs(x="Year", y="\nTristan Albatross Population Size (Individuals)\n",
+  labs(x="Year", y="Tristan Albatross Population Size (Individuals)",
        col="Total population scenario",
        fill="Total population scenario",
        linetype="Breeding population") +
@@ -212,7 +212,7 @@ ggplot(plot1_df) +
         panel.border = element_rect(fill=NA, colour = "black"))
 
 #ggsave("TRAL_IPM_pop_trend_Gough_2004_2050_Ntot.jpg", width=14, height=8)
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig1_revised.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig2_revised.jpg", width=14, height=8)
 
 
 ## ALTERNATIVE PLOT WITH TWO SEPARATE AXES
@@ -276,8 +276,43 @@ plot1_df %>% filter(Year==2050) %>%
 
 
 
+#########################################################################
+# FIG. S1 - PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR PRODUCTIVITY
+#########################################################################
+bsout<-bsout %>% filter(Year<2022)
+
+## CREATE PLOT FOR POP TREND AND SAVE AS PDF
+ggplot(bsout) + 
+  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   #
+  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
+  geom_smooth(aes(y=Median, x=Year),method="lm",se=T,col="grey12", size=1)+
+  ylab("Breeding success of Tristan Albatross") +
+  xlab("Year") +
+  geom_hline(aes(yintercept = 0.63), colour="gray15", linetype = "dashed", size=1) +
+  scale_y_continuous(breaks=seq(0,0.8,0.2), limits=c(0,0.8))+
+  scale_x_continuous(breaks=seq(2004,2021,2), limits=c(2003.7,2021.2))+
+  
+  ### add the bird icons
+  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),
+        legend.text=element_text(size=14),
+        legend.title = element_text(size=16),
+        legend.position=c(0.26,0.9),
+        #panel.grid.major = element_blank(), 
+        #panel.border = element_blank(),
+        panel.grid.minor = element_blank())
+
+#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS1_rev.jpg", width=14, height=8)
+
+
+
+
+
 ######################################################################################
-# CALCULATE PROBABILITY OF EXTINCTION AND PROBABILITY OF HIGHER POP IN MGMT SCENARIOS
+# FIG. S2: CALCULATE PROBABILITY OF EXTINCTION AND PROBABILITY OF HIGHER POP IN MGMT SCENARIOS
 ######################################################################################
 
 # (1) the probability that the given management scenario would result in a larger population size in 2050 relative to the size predicted with no change
@@ -323,14 +358,19 @@ Ntot.f.samp %>% rename(past=`Ntot[1]`,nochange=`Ntot.f[1,30]`,erad=`Ntot.f[2,30]
 ## plot histograms for future pop after 30 years
 Ntot.f.samp %>% select(-`Ntot[1]`) %>% rename(nochange=`Ntot.f[1,30]`,erad=`Ntot.f[2,30]`,worse=`Ntot.f[3,30]`) %>%
   gather(key="Scenario",value="N") %>%
+  mutate(N = N*2) %>%  ## multiply by 2 to add in males
   mutate(Scenario=if_else(Scenario=="erad", "after successful mouse eradication",if_else(Scenario=="worse","unsuccessful mouse eradication and worse impacts","no future change"))) %>%
   
   ggplot(aes(x = N, fill = Scenario)) +                       # Draw overlaying histogram
   geom_histogram(position = "identity", alpha = 0.2, bins = 80, aes(y = ..density..), color="black") +
   geom_density(alpha=0.5) +
+  geom_segment(aes(x = 4981*2, y = 0, xend = 4981*2, yend = 0.001), colour="gray15", linetype = "dashed", size=1)+
   
-  labs(x="Tristan Albatross population size in 2050 (Individuals)", y="\nProbability density\n",
+  scale_y_continuous(breaks=seq(0,0.00125,0.00025), limits=c(0,0.0015),labels=seq(0,0.125,0.025), expand = c(0, 0))+
+  labs(x="Tristan Albatross population size in 2050 (Individuals)", y="Probability density",
      fill="Scenario") +
+  scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
+  scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
 
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
@@ -346,10 +386,13 @@ Ntot.f.samp %>% select(-`Ntot[1]`) %>% rename(nochange=`Ntot.f[1,30]`,erad=`Ntot
         panel.border = element_rect(fill=NA, colour = "black"))
 
 
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS5.jpg", width=14, height=8)
+#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS2_revised.jpg", width=14, height=8)
 
 
 
+######################################################################################
+# NOT USED SUPPLEMENTARY FIGURES: CALCULATE PROBABILITY OF LAMBDA <1
+######################################################################################
 
 
 
@@ -381,8 +424,10 @@ fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,
   geom_histogram(position = "identity", alpha = 0.2, bins = 80, aes(y = ..density..), color="black") +
   geom_density(alpha=0.5) +
   geom_vline(aes(xintercept = 1), colour="indianred3", size=1) +
-  labs(x="Future population growth rate", y="\nProbability density\n",
+  labs(x="Future population growth rate", y="Probability density",
        fill="Scenario") +
+  scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
+  scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
@@ -401,131 +446,16 @@ fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,
 
 
 
-
-
-
-
-#########################################################################
-# PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR PRODUCTIVITY
-#########################################################################
-bsout<-bsout %>% filter(Year<2021)
-
-## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-ggplot(bsout) + 
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   #
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-  geom_smooth(aes(y=Median, x=Year),method="lm",se=T,col="grey12", size=1)+
-  ylab("\nBreeding success of Tristan Albatross\n") +
-  xlab("Year") +
-  scale_y_continuous(breaks=seq(0,0.8,0.2), limits=c(0,0.8))+
-  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2020))+
-  
-  ### add the bird icons
-  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
-        axis.title=element_text(size=20),
-        legend.text=element_text(size=14),
-        legend.title = element_text(size=16),
-        legend.position=c(0.26,0.9),
-        #panel.grid.major = element_blank(), 
-        #panel.border = element_blank(),
-        panel.grid.minor = element_blank())
-
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3.jpg", width=14, height=8)
-
-
-
-
-
-
-
-
 #############################################################################################
 # PRODUCE PLOT OF ANNUAL LAMBDA AGAINST BREEDING SUCCESS, SURVIVAL, AND RESIGHT PROBABILITY
 #############################################################################################
 
 str(TRALipm$mcmc)
-retain<-parameters[c(8,15,4,11,12,14,9,13,18)]
-
-### need the following parameters from model
-#which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[17]") # lambda: 8-24
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[43]") # phi.ad: 177-194
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.juv[43]") # phi.juv: 220-237
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[1]") # ann.fec: 256 - 273
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="breed.prop[18]") # breed.prop: 4-21
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[18]") # Ntot.breed: 238-255
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[18]") # Ntot: 44-61
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[1,1,1]") # IM: 321-860
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,1]") # IM: 321-860
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="agebeta")
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="mean.p.juv[2]")
-
-retain
-retaincols<-c(43, #agebeta
-              275, #mean.p.juv[2]
-              4:21, # breed.prop
-              177:194, #phi.ad
-              220:238, # phi.juv
-              256:273, # ann.fec
-              44:61, #Ntot
-              238:255, #Ntot.breed
-              321:860) # IM year 1:18 for ages 1:30
-
-### EXTRACT ALL FROM THE MODEL OUTPUT AND SAVE IN DIFFERENT LIST
-
-LTRE_input_mcmc<-as.matrix(TRALipm$mcmc[[1]])[,retaincols]
-str(LTRE_input_mcmc)
-
-for(ch in 2:nc){
-  LTRE_input_mcmc<-rbind(LTRE_input_mcmc,as.matrix(TRALipm$mcmc[[ch]])[,retaincols])
-}
-
-
-
-
-## CREATE PLOT FOR POP TREND AND SAVE AS PDF
-ggplot() + 
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   # lambda
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-  
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   # phi.juv
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-  
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   # phi.ad
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-  
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   # ann.fec
-  geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
-
-  ylab("\nDemographic of Tristan Albatross\n") +
-  xlab("Year") +
-  scale_y_continuous(breaks=seq(0,2,0.2), limits=c(0,2))+
-  scale_x_continuous(breaks=seq(2004,2020,2), limits=c(2004,2020))+
-  
-  ### add the bird icons
-  #annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=16000, ymax=20000) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
-        axis.title=element_text(size=20),
-        legend.text=element_text(size=14),
-        legend.title = element_text(size=16),
-        legend.position=c(0.26,0.9),
-        #panel.grid.major = element_blank(), 
-        #panel.border = element_blank(),
-        panel.grid.minor = element_blank())
-
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig2rev.jpg", width=14, height=8)
-
-
-
-
+#retain<-parameters[c(8,15,4,11,12,14,9,13,18)]
 
 
 ############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
-
+### need the following parameters from model
 ## # Step 1: Using the JAGS output (named TRALipm$mcmc),         # compute realized population growth rates for Tristan Albatross 
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[1]") # lambda: 26-42
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[43]") # phi.ad: 177-194
@@ -610,7 +540,7 @@ ggplot() + geom_point(aes(y=lambda,x=value)) +
         panel.grid.minor = element_blank(), 
         panel.border = element_blank())
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS4.jpg", width=9, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3_rev.jpg", width=14, height=8)
 
 
 
