@@ -640,7 +640,7 @@ jags.data <- list(marr.j = chick.marray,
                   n.sites=n.sites,
                   T = n.years,
                   prop.sites=mean.props,
-                  y.count=R,    ### use log(R) here if using the logscale model
+                  y.count=R[1:18,],    ### remove the count data from 2022 ##use log(R) here if using the logscale model
                   
                   ### breeding success data
                   J=PROD.DAT$J,
@@ -681,7 +681,7 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","breed.prop",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
                 #new
                 "ann.fec", "mean.p.juv","mean.p.ad","p.ad",#"p.juv",
-                "IM") ## added IM and JUV to facilitate LTRE analysis
+                "IM","N.breed.ready","N.recruits","N.atsea","p.juv.recruit") ## added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE
 rm(list=setdiff(ls(), c("parameters","jags.data","inits","n.years","n.sites")))

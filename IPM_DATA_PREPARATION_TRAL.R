@@ -108,7 +108,8 @@ exclude <- nests %>%
 
 ### summary of breeding success per year from nests
 FECUND<-nests %>% filter(Species==SP) %>% mutate(count=1) %>%
-  mutate(SUCCESS=ifelse(Year==2021 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
+  filter(Year<2022) %>%
+  #mutate(SUCCESS=ifelse(Year==2022 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
   filter(!NestID %in% exclude$NestID) %>%
   group_by(Year,Colony) %>%
   summarise(n_nests=sum(count),BREED_SUCC=mean(SUCCESS, na.rm=T))
@@ -126,7 +127,8 @@ ggplot(FECUND, aes(x=Year,y=BREED_SUCC)) +geom_point(size=2, color='darkred')+ge
 
 ###   PREPARE A METRIC OF ANNUAL MEAN NEST FAILURE DATE
 nestfail<-nests %>% filter(Species==SP) %>% mutate(count=1) %>%
-  mutate(SUCCESS=ifelse(Year==2021 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
+  filter(Year<2022) %>%
+  #mutate(SUCCESS=ifelse(Year==2022 & is.na(DateLastChecked),1,SUCCESS)) %>%  ### set the 2021 nest that have not been entered as fledged yet
   filter(!NestID %in% exclude$NestID) %>%
   filter(SUCCESS==0) %>%
   mutate(LastDay=yday(DateLastAlive)) %>%
@@ -166,7 +168,9 @@ POPSIZE
 
 ### PLOT TO SPOT ANY OUTLIERS OF COUNT DATA
 POPSIZE %>% gather(key="Colony",value="N",-Year) %>% group_by(Year) %>% summarise(TOT=sum(N, na.rm=T)) %>% #summarise(avg=median(TOT))
+  filter(Year>2001) %>%
 ggplot(aes(x=Year,y=TOT)) +geom_point(size=2, color='darkred')+geom_smooth(method='lm') +
+  labs(y="Tristan Albatross breeding pairs") +
   theme(panel.background=element_rect(fill="white", colour="black"),  
         axis.text=element_text(size=18, color="black"), 
         axis.title=element_text(size=20),  
@@ -403,7 +407,7 @@ ggplot() + geom_bar(aes(x=Contact_Year,y=prop.seen, fill=Effort), stat="identity
         legend.position=c(0.15, 0.90),
         panel.border = element_blank()) 
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\submitted\\TRAL_IPM\\FigS1_rev.jpg", width=9, height=6)
+#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\submitted\\TRAL_IPM\\FigS1_rev.jpg", width=9, height=6)
 
 
 
