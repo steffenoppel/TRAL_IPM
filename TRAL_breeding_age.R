@@ -31,7 +31,7 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 ## SPECIFY THE SPECIES AND START YEAR FOR SURVIVAL MODEL
 SP<-"TRAL"
 start<-1978  ## for CMR data
-IPMstart<-2000 ## for count and breeding success data
+IPMstart<-2004 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
 #system(paste0("C:/PROGRA~1/R/R-35~1.1/bin/i386/Rscript.exe ", shQuote("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM\\RODBC_CMR_import_TRAL.R")), wait = TRUE, invisible = FALSE, intern = T)
@@ -163,7 +163,8 @@ breeders<-contacts %>%
   left_join(goodyears, by="Contact_Year") %>%
   filter(Contact_Year>2009) 
 dim(breeders)
-
+min(breeders$ContAge)
+breeders %>% filter(ContAge<6)
 
 ### exploratory plots
 ggplot(breeders) +
