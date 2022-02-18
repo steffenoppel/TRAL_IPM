@@ -164,7 +164,9 @@ goodyears<-contacts %>% group_by(Contact_Year) %>% summarise(n=length(unique(Bir
   mutate(p.sel=if_else(prop.seen<0.1,1,if_else(prop.seen<0.25,2,3))) %>%
   mutate(p.sel.tot=if_else(n<250,1,if_else(n<750,2,3))) %>%
   mutate(prop.pot.old=ifelse(Contact_Year<1985,0,
-                             ifelse(Contact_Year<20066,156/N_ever,dplyr::lag(N_ever,n=30)/N_ever))) ## specifies what proportion of birds could possibly be >30
+                             ifelse(Contact_Year<2006,
+                                    156/dplyr::lag(N_ever,n=4),
+                                    dplyr::lag(N_ever,n=30)/dplyr::lag(N_ever,n=4)))) ## specifies what proportion of birds could possibly be >30
   #filter(Contact_Year>1978)
 tail(goodyears)
 
@@ -211,49 +213,6 @@ predict(m2eff, newdat=data.frame(Contact_Year=seq(2000,2020,1),detrend=1), type=
 
 ### does the proportion of young breeders change over time?
 ## removed on 2 Oct 2021 because it is too confusing and will lead to questions of age at first breeding which we cannot answer
-# 
-# youngbreeders<-contacts %>%
-#   filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
-#   mutate(Breeding_StatusID=ifelse(is.na(Nest_Description),Breeding_StatusID,1)) %>%
-#   filter(Breeding_StatusID %in% c(1,-1525788936,105568723,1899636611,1899636612,1899636618)) %>%
-#   group_by(BirdID,Contact_Year) %>%
-#   summarise(ContAge=mean(ContAge)) %>%
-#   left_join(goodyears, by="Contact_Year") %>%
-#   ungroup() %>%
-#   mutate(YOUNG=ifelse(ContAge<10,1,0)) %>%
-#   mutate(OLD=ifelse(ContAge>9,1,0)) %>%
-#   group_by(Contact_Year) %>%
-#   summarise(prop.young=mean(YOUNG),n.young=sum(YOUNG),n.old=sum(OLD)) %>%
-#   left_join(goodyears, by="Contact_Year") %>%
-#   filter(Contact_Year>2003) 
-# dim(youngbreeders)
-# 
-# 
-# ### analysis of trend over time
-# 
-# # m2qeff<-glm(cbind(n.young,n.old)~Contact_Year+I(Contact_Year^2), data=youngbreeders, family="binomial", weights=prop.seen)
-# # summary(m2qeff)
-# 
-# m2leff<-glm(cbind(n.young,n.old)~Contact_Year, data=youngbreeders, family="binomial", weights=prop.seen)
-# summary(m2leff)
-# 
-# 
-# ### prediction of effect size
-# newdat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
-# 
-# ## grad the inverse link function
-# ilink <- family(m2leff)$linkinv
-# ## add fit and se.fit on the **link** scale
-# newdat <- bind_cols(newdat, setNames(as_tibble(predict(m2leff, newdat, se.fit = TRUE)[1:2]),
-#                                      c('fit_link','se_link')))
-# ## create the interval and backtransform
-# newdat <- mutate(newdat,
-#                  pred.prop  = ilink(fit_link),
-#                  ucl = ilink(fit_link + (1.96 * se_link)),
-#                  lcl = ilink(fit_link - (1.96 * se_link)))
-
-
-
 
 ### does the proportion of OLD breeders change over time?
 
@@ -281,9 +240,10 @@ dim(oldbreeders)
 
 m2oleff<-glm(cbind(n.old,n.young)~Contact_Year+offset(prop.pot.old), data=oldbreeders, family="binomial", weights=prop.seen)
 summary(m2oleff)
-
+str(m2oleff)
+m2oleff$fitted.values
 ### prediction of effect size
-olddat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1, prop.pot.old=0.05)
+olddat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1, prop.pot.old=0.01)
 
 ## grad the inverse link function
 ilink <- family(m2oleff)$linkinv
@@ -296,63 +256,30 @@ olddat <- mutate(olddat,
                  ucl = ilink(fit_link + (1.96 * se_link)),
                  lcl = ilink(fit_link - (1.96 * se_link)))
 
-### COMBINE PROPORTION OF YOUNG AND OLD BREEDERS IN ONE PLOT
-## abandoned on 2 Oct 2021 because only old breeder proportion shown in manuscript
-# colors <- c("young (< 10 years old)" = "steelblue", "old (>30 years old)" = "indianred")
-# ggplot(newdat) +
-#   geom_line(aes(x=Contact_Year, y=pred.prop,colour = "young (< 10 years old)")) +
-#   geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl),fill = "steelblue", alpha = 0.2) +
-#   geom_point(data=youngbreeders,aes(x=Contact_Year, y=prop.young,colour = "young (< 10 years old)"), size=3) +
-#   
-#   geom_line(data=olddat,aes(x=Contact_Year, y=pred.prop,colour = "old (>30 years old)")) +
-#   geom_ribbon(data=olddat,aes(x=Contact_Year, ymin=lcl, ymax=ucl), fill= "indianred",alpha = 0.2) +
-#   geom_point(data=oldbreeders,aes(x=Contact_Year, y=prop.old,colour = "old (>30 years old)"), size=3) +
-#   labs(x = "Year",
-#        y = "Annual proportion of breeders",
-#        color = "Age group") +
-#   scale_color_manual(values = colors) +
-#   scale_y_continuous(breaks=seq(0,0.4,0.1), limits=c(0,0.4))+
-#   scale_x_continuous(breaks=seq(2005,2021,2), limits=c(2004,2021))+
-#   
-#   
-#   ### add the bird icons
-#   annotation_custom(TRALicon, xmin=2013.5, xmax=2015.5, ymin=0.32, ymax=0.42) +
-#   
-#   theme(panel.background=element_rect(fill="white", colour="black"), 
-#         axis.text=element_text(size=18, color="black"), 
-#         axis.title=element_text(size=20),
-#         legend.title=element_text(size=18),
-#         legend.text=element_text(size=16),
-#         legend.background=element_blank(),
-#         legend.key=element_blank(),
-#         legend.position=c(0.80, 0.90),
-#         panel.grid.minor = element_blank())
-# 
-# ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig2.jpg", width=9, height=6)
 
 
 ### COMBINE PROPORTION OF YOUNG AND OLD BREEDERS IN ONE PLOT
 ggplot(olddat) +
 
-  geom_line(data=oldbreeders,aes(x=Contact_Year, y=prop.pot.old),colour = "darkgrey",linetype="dashed") +
+  #geom_line(data=oldbreeders,aes(x=Contact_Year, y=prop.pot.old),colour = "darkgrey",linetype="dashed") +
   geom_line(aes(x=Contact_Year, y=pred.prop),colour = "indianred") +
   geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl), fill= "indianred",alpha = 0.2) +
   geom_point(data=oldbreeders,aes(x=Contact_Year, y=prop.old), size=3) +
   labs(x = "Year",
        y = "Annual proportion of old breeders") +
-  scale_y_continuous(breaks=seq(0,0.15,0.03), limits=c(0,0.15))+
+  scale_y_continuous(breaks=seq(0,0.10,0.02), limits=c(0,0.10))+
   scale_x_continuous(breaks=seq(2005,2021,2), limits=c(2004,2021))+
   
   
   ### add the bird icons
-  annotation_custom(TRALicon, xmin=2004.5, xmax=2006.5, ymin=0.12, ymax=0.15) +
+  annotation_custom(TRALicon, xmin=2004.5, xmax=2006.5, ymin=0.06, ymax=0.10) +
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
         axis.title=element_text(size=20),
         panel.grid.minor = element_blank())
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig3.jpg", width=9, height=6)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_rev.jpg", width=9, height=6)
 
 
 
