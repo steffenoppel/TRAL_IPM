@@ -12,6 +12,8 @@
 ## update on 2 Oct 2021: after chat with Cat Horswill try to examine whether mean age at first breeding 2004-2009 is higher than 2015-2021
 ## switched questions and figures for manuscript, because prop old breeders is more logical and should be key evidence
 
+## updated 18 February 2022: repeated questions that increase in age proportion could simply be due to when ringing began - examine in more detail
+
 library(tidyverse)
 library(lubridate)
 library(data.table)
@@ -30,7 +32,7 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 #############################################################################
 ## SPECIFY THE SPECIES AND START YEAR FOR SURVIVAL MODEL
 SP<-"TRAL"
-start<-1978  ## for CMR data
+start<-1950  ## for CMR data
 IPMstart<-2004 ## for count and breeding success data
 
 ## run the RODBC import of CMR data in a 32-bit version of R
@@ -63,7 +65,8 @@ deploy_age<-contacts %>% arrange(BirdID, Date_Time,Contact_Year) %>%
   mutate(AGE=ifelse(Age %in% c("Chick","Fledgling"),0,1)) %>%
   group_by(BirdID) %>%
   summarise(MIN_AGE=min(AGE), MAX_AGE=max(AGE), FIRST_AGE=first(Age), FIRST_Date=first(Date_Time), FIRST_YEAR=min(Contact_Year)) %>%
-  mutate(FIRST_AGE=ifelse(FIRST_AGE=="Unknown" & month(FIRST_Date)<5,"Adult", as.character(FIRST_AGE)))  ### unknowns marked before May were not chicks
+  mutate(FIRST_AGE=ifelse(FIRST_AGE=="Unknown" & month(FIRST_Date)<5,"Adult", as.character(FIRST_AGE))) %>%  ### unknowns marked before May were not chicks
+  mutate(FIRST_AGE=ifelse(is.na(FIRST_AGE), ifelse(month(FIRST_Date)<5,"Adult","Chick"), as.character(FIRST_AGE)))  ### unknowns marked before May were not chicks
 
 head(deploy_age)
 dim(deploy_age)
@@ -130,17 +133,39 @@ unique(contacts$FIRST_AGE)
 contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
   ggplot() + geom_bar(aes(x=Contact_Year,y=n), stat="identity")
 
-## calculate number of individuals that had been marked by a given year
 n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
-  group_by(Contact_Year) %>%
+  mutate(FIRST_AGE=if_else(FIRST_AGE=="Fledgling","Chick",FIRST_AGE)) %>%
+  group_by(Contact_Year,FIRST_AGE) %>%
   summarise(N_marked=sum(count)) %>%
   arrange(Contact_Year) %>%
-  mutate(N_all = cumsum(N_marked))
+  spread(key=FIRST_AGE, value=N_marked, fill=0) %>%
+  ungroup() %>%
+  mutate(N_marked=Adult+Chick) %>%
+  mutate(N_ever = cumsum(N_marked),N_all = cumsum(N_marked)) %>%
+  bind_rows(tibble(Contact_Year=2022,Adult=0,Chick=0,N_marked=0,N_all=0, N_ever=5039)) %>%
+  mutate(N_all=if_else(Contact_Year==2022,dplyr::lag(N_all),N_all)) %>%
+  arrange(Contact_Year)  
+n_exist$N_all[1] = n_exist$N_marked[1]
+n_exist$N_all[2] = (n_exist$Adult[1]*0.96) + (n_exist$Chick[1]*0.85) + n_exist$N_marked[2]
+n_exist$N_all[3] = (n_exist$N_all[2]*(0.96^19)) + n_exist$N_marked[3]
+n_exist$N_all[4] = (n_exist$Adult[3]*0.96) + (n_exist$Chick[3]*0.85) + (n_exist$N_all[2]*(0.96^19)) + n_exist$N_marked[4]
+for (y in 5:dim(n_exist)[1]) {
+  n_exist$N_all[y] = ((n_exist$Adult[y-1]+n_exist$N_all[y-2])*0.96) + (n_exist$Chick[y-1]*0.85) + n_exist$N_marked[y]
+}
+tail(n_exist)
 
-goodyears<-contacts %>% mutate(count=1) %>% group_by(Contact_Year) %>% summarise(n=sum(count)) %>%
+
+### ADDED - A COLUMN THAT SAYS WHAT PROPORTION OF BIRDS WERE MARKED > 30 YEARS AGO
+
+goodyears<-contacts %>% group_by(Contact_Year) %>% summarise(n=length(unique(BirdID))) %>%
   left_join(n_exist, by='Contact_Year') %>%
   mutate(prop.seen=n/N_all) %>%
-  mutate(p.sel=if_else(prop.seen>0.1,2,1))
+  mutate(recap_effort=n-N_marked) %>%
+  mutate(p.sel=if_else(prop.seen<0.1,1,if_else(prop.seen<0.25,2,3))) %>%
+  mutate(p.sel.tot=if_else(n<250,1,if_else(n<750,2,3))) %>%
+  mutate(prop.pot.old=ifelse(Contact_Year<1985,0,
+                             ifelse(Contact_Year<20066,156/N_ever,dplyr::lag(N_ever,n=30)/N_ever))) ## specifies what proportion of birds could possibly be >30
+  #filter(Contact_Year>1978)
 tail(goodyears)
 
 
@@ -150,6 +175,8 @@ tail(goodyears)
 #############################################################################
 ##   QUESTION 1: does age of breeders change over time? ###############
 #############################################################################
+
+### THIS QUESTION IS MASSIVELY AFFECTED BY WHEN THE RINGING BEGAN AS THERE IS AN INCREASING AGE OVER TIME
 
 ### this requires the breeding status ID to be added to the access query
 
@@ -161,7 +188,8 @@ breeders<-contacts %>%
   group_by(BirdID,Contact_Year) %>%
   summarise(ContAge=mean(ContAge)) %>%
   left_join(goodyears, by="Contact_Year") %>%
-  filter(Contact_Year>2009) 
+  mutate(detrend=Contact_Year-1980) %>%
+  filter(Contact_Year>1990) 
 dim(breeders)
 min(breeders$ContAge)
 breeders %>% filter(ContAge<6)
@@ -171,15 +199,15 @@ ggplot(breeders) +
   geom_point(aes(x=Contact_Year, y=ContAge)) +
   geom_smooth(aes(x=Contact_Year, y=ContAge),method="lm")
 
-ggplot(breeders) +
-  geom_histogram(aes(x=ContAge)) +
-  facet_wrap(~Contact_Year)
+# ggplot(breeders) +
+#   geom_histogram(aes(x=ContAge)) +
+#   facet_wrap(~Contact_Year)
 
 ### analysis
 m2eff<-glm(ContAge~Contact_Year, data=breeders, family="poisson",weights=prop.seen)
 summary(m2eff)
 
-
+predict(m2eff, newdat=data.frame(Contact_Year=seq(2000,2020,1),detrend=1), type='response')
 
 ### does the proportion of young breeders change over time?
 ## removed on 2 Oct 2021 because it is too confusing and will lead to questions of age at first breeding which we cannot answer
@@ -229,6 +257,9 @@ summary(m2eff)
 
 ### does the proportion of OLD breeders change over time?
 
+## first, calculate the proportion of birds in each year that could have plausibly been >30 years
+head(goodyears)
+
 oldbreeders<-contacts %>%
   filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
   mutate(Breeding_StatusID=ifelse(is.na(Nest_Description),Breeding_StatusID,1)) %>%
@@ -248,11 +279,11 @@ dim(oldbreeders)
 
 ### analysis of trend over time
 
-m2oleff<-glm(cbind(n.old,n.young)~Contact_Year, data=oldbreeders, family="binomial", weights=prop.seen)
+m2oleff<-glm(cbind(n.old,n.young)~Contact_Year+offset(prop.pot.old), data=oldbreeders, family="binomial", weights=prop.seen)
 summary(m2oleff)
 
 ### prediction of effect size
-olddat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
+olddat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1, prop.pot.old=0.05)
 
 ## grad the inverse link function
 ilink <- family(m2oleff)$linkinv
@@ -303,6 +334,7 @@ olddat <- mutate(olddat,
 ### COMBINE PROPORTION OF YOUNG AND OLD BREEDERS IN ONE PLOT
 ggplot(olddat) +
 
+  geom_line(data=oldbreeders,aes(x=Contact_Year, y=prop.pot.old),colour = "darkgrey",linetype="dashed") +
   geom_line(aes(x=Contact_Year, y=pred.prop),colour = "indianred") +
   geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl), fill= "indianred",alpha = 0.2) +
   geom_point(data=oldbreeders,aes(x=Contact_Year, y=prop.old), size=3) +
@@ -320,7 +352,49 @@ ggplot(olddat) +
         axis.title=element_text(size=20),
         panel.grid.minor = element_blank())
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig2.jpg", width=9, height=6)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\in_prep\\TRAL_IPM\\Fig3.jpg", width=9, height=6)
+
+
+
+
+################### CHECK WHETHER THE NUMBER OF OLD BIRDS CHANGES #####################################################
+## ####
+
+### does the proportion of OLD breeders change over time?
+
+oldbirds<-contacts %>%
+  filter(!(FIRST_YEAR==Contact_Year)) %>%   ## potentially change this to remove only ringed chicks? Age %in% c("Chick","Fledgling")
+  group_by(BirdID,Contact_Year) %>%
+  summarise(ContAge=mean(ContAge)) %>%
+  left_join(goodyears, by="Contact_Year") %>%
+  ungroup() %>%
+  mutate(YOUNG=ifelse(ContAge<30,1,0)) %>%
+  mutate(OLD=ifelse(ContAge>29,1,0)) %>%
+  group_by(Contact_Year) %>%
+  summarise(prop.old=mean(OLD),n.young=sum(YOUNG),n.old=sum(OLD)) %>%
+  left_join(goodyears, by="Contact_Year") %>%
+  filter(Contact_Year>2003) 
+
+
+### analysis of trend over time
+
+m2oleff<-glm(cbind(n.old,n.young)~Contact_Year, data=oldbirds, family="binomial", weights=prop.seen)
+summary(m2oleff)
+
+### prediction of effect size
+olddat<-data.frame(Contact_Year=seq(2004,2021,1),prop.seen=1)
+
+## grad the inverse link function
+ilink <- family(m2oleff)$linkinv
+## add fit and se.fit on the **link** scale
+olddat <- bind_cols(olddat, setNames(as_tibble(predict(m2oleff, olddat, se.fit = TRUE)[1:2]),
+                                     c('fit_link','se_link')))
+## create the interval and backtransform
+olddat <- mutate(olddat,
+                 pred.prop  = ilink(fit_link),
+                 ucl = ilink(fit_link + (1.96 * se_link)),
+                 lcl = ilink(fit_link - (1.96 * se_link)))
+
 
 
 

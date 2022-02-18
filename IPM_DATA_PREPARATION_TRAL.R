@@ -261,7 +261,8 @@ deploy_age<-contacts %>% arrange(BirdID, Date_Time,Contact_Year) %>%
   mutate(AGE=ifelse(Age %in% c("Chick","Fledgling"),0,1)) %>%
   group_by(BirdID) %>%
   summarise(MIN_AGE=min(AGE), MAX_AGE=max(AGE), FIRST_AGE=first(Age), FIRST_Date=first(Date_Time), FIRST_YEAR=min(Contact_Year)) %>%
-  mutate(FIRST_AGE=ifelse(FIRST_AGE=="Unknown" & month(FIRST_Date)<5,"Adult", as.character(FIRST_AGE)))  ### unknowns marked before May were not chicks
+  mutate(FIRST_AGE=ifelse(FIRST_AGE=="Unknown" & month(FIRST_Date)<5,"Adult", as.character(FIRST_AGE))) %>%  ### unknowns marked before May were not chicks
+  mutate(FIRST_AGE=ifelse(is.na(FIRST_AGE), ifelse(month(FIRST_Date)<5,"Adult","Chick"), as.character(FIRST_AGE)))  ### unknowns marked before May were not chicks
 
 head(deploy_age)
 dim(deploy_age)
