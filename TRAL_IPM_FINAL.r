@@ -811,8 +811,8 @@ message("total workspace is ",appendLF = F); print(size, units='auto')
 rm(addsummary_tralipm,IM)
 gc()
 
-save.image("TRAL_IPM_output_REV2022_FINAL.RData")
+save.image("TRAL_IPM_output_REV2022_FINAL_minage.RData")
 setwd("G:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_output_REV2022_FINAL.RData")
+save.image("TRAL_IPM_output_REV2022_FINAL_minage.RData")
 
 

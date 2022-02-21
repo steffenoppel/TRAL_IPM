@@ -40,11 +40,11 @@ library(magick)
 # LOAD MODEL OUTPUT FROM IPMs
 #########################################################################
 
-setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+setwd("G:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 #load("TRAL_IPM_output_FINAL_REV2021.RData")
-load("TRAL_IPM_output_REV2022_FINAL.RData")
+load("TRAL_IPM_output_REV2022_FINAL_minage.RData")
 imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
 TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
@@ -161,8 +161,8 @@ plot1_df <- export %>%
   filter(grepl("Ntot",parameter,perl=T,ignore.case = T)) %>%
   filter(!grepl("Ntot.breed",parameter)) %>%
   arrange(Year) %>%
-  mutate(Scenario="past, and no future change") %>%
-  mutate(Scenario=if_else(grepl("f\\[2",parameter,perl=T,ignore.case = T), "after successful mouse eradication",if_else(grepl("f\\[3",parameter,perl=T,ignore.case = T),"unsuccessful mouse eradication and worsening impacts",Scenario))) %>%
+  mutate(Scenario="no future change") %>%
+  mutate(Scenario=if_else(grepl("f\\[2",parameter,perl=T,ignore.case = T), "after successful mouse eradication",if_else(grepl("f\\[3",parameter,perl=T,ignore.case = T),"no mouse eradication and worsening impacts",Scenario))) %>%
   mutate(ucl=if_else(ucl>15000,15000,ucl)) %>%
   filter(!(Median<500 & Year<2020)) #%>%
 #mutate(Median=ifelse(Year>2021 & Scenario=="status quo",NA,Median)) %>%
@@ -408,6 +408,11 @@ for(ch in 1:nc){
 }
 head(fut.lam.samp)
 dim(fut.lam.samp)
+
+## PROBABILITY OF FUTURE GROWTH
+fut.lam.samp %>% gather(key="scenario",value="lam") %>% mutate(pos=ifelse(lam>1,1,0)) %>%
+  group_by(scenario) %>%
+  summarise(prob=sum(pos)/dim(fut.lam.samp)[1])
 
 
 ## quantify probability of lambda>1

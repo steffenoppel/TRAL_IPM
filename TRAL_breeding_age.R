@@ -141,8 +141,8 @@ n_exist<-deploy_age %>% mutate(count=1) %>% rename(Contact_Year=FIRST_YEAR) %>%
   spread(key=FIRST_AGE, value=N_marked, fill=0) %>%
   ungroup() %>%
   mutate(N_marked=Adult+Chick) %>%
-  mutate(N_ever = cumsum(N_marked),N_all = cumsum(N_marked)) %>%
-  bind_rows(tibble(Contact_Year=2022,Adult=0,Chick=0,N_marked=0,N_all=0, N_ever=5039)) %>%
+  mutate(N_ever_ad = cumsum(Adult),N_ever_ch = cumsum(Chick),N_all = cumsum(N_marked)) %>%
+  bind_rows(tibble(Contact_Year=2022,Adult=0,Chick=0,N_marked=0,N_all=0, N_ever_ad=1404, N_ever_ch=3635)) %>%
   mutate(N_all=if_else(Contact_Year==2022,dplyr::lag(N_all),N_all)) %>%
   arrange(Contact_Year)  
 n_exist$N_all[1] = n_exist$N_marked[1]
@@ -158,16 +158,25 @@ tail(n_exist)
 ### ADDED - A COLUMN THAT SAYS WHAT PROPORTION OF BIRDS WERE MARKED > 30 YEARS AGO
 
 goodyears<-contacts %>% group_by(Contact_Year) %>% summarise(n=length(unique(BirdID))) %>%
+  filter(!(Contact_Year==1959)) %>%   ## remove single re-sighting from 1959
   left_join(n_exist, by='Contact_Year') %>%
   mutate(prop.seen=n/N_all) %>%
-  mutate(recap_effort=n-N_marked) %>%
-  mutate(p.sel=if_else(prop.seen<0.1,1,if_else(prop.seen<0.25,2,3))) %>%
-  mutate(p.sel.tot=if_else(n<250,1,if_else(n<750,2,3))) %>%
-  mutate(prop.pot.old=ifelse(Contact_Year<1985,0,
+  mutate(old.ad=ifelse(Contact_Year<1981,0,
+                             ifelse(Contact_Year<2002,
+                                    142,
+                                    dplyr::lag(N_ever_ad,n=26)))) %>% ## specifies adults that were already 4 years old when ringed
+
+  mutate(old.ch=ifelse(Contact_Year<1985,0,
                              ifelse(Contact_Year<2006,
-                                    156/dplyr::lag(N_ever,n=4),
-                                    dplyr::lag(N_ever,n=30)/dplyr::lag(N_ever,n=4)))) ## specifies what proportion of birds could possibly be >30
-  #filter(Contact_Year>1978)
+                                    21,
+                                    dplyr::lag(N_ever_ch,n=30)))) %>%  ## specifies chicks that were already 4 years old when ringed
+  mutate(all.pot.old=(old.ad+old.ch)) %>%
+  mutate(all.pot.ad=cumsum(Adult), all.pot.ch=cumsum(Chick)) %>%
+  mutate(all.pot.breed=dplyr::lag(all.pot.ch,n=4)+all.pot.ad) %>%
+  mutate(prop.pot.old=all.pot.old/all.pot.breed) %>%
+  select(Contact_Year,n,Adult,Chick,N_marked,N_all,prop.seen,prop.pot.old)
+
+#filter(Contact_Year>1978)
 tail(goodyears)
 
 
@@ -234,7 +243,7 @@ oldbreeders<-contacts %>%
   left_join(goodyears, by="Contact_Year") %>%
   filter(Contact_Year>2003) 
 dim(oldbreeders)
-
+fwrite(oldbreeders,"TRAL_old_breeders_2004_2021.csv")
 
 ### analysis of trend over time
 
@@ -261,13 +270,13 @@ olddat <- mutate(olddat,
 ### COMBINE PROPORTION OF YOUNG AND OLD BREEDERS IN ONE PLOT
 ggplot(olddat) +
 
-  #geom_line(data=oldbreeders,aes(x=Contact_Year, y=prop.pot.old),colour = "darkgrey",linetype="dashed") +
+  geom_line(data=oldbreeders,aes(x=Contact_Year, y=prop.pot.old),colour = "darkgrey",linetype="dashed") +
   geom_line(aes(x=Contact_Year, y=pred.prop),colour = "indianred") +
   geom_ribbon(aes(x=Contact_Year, ymin=lcl, ymax=ucl), fill= "indianred",alpha = 0.2) +
   geom_point(data=oldbreeders,aes(x=Contact_Year, y=prop.old), size=3) +
   labs(x = "Year",
        y = "Annual proportion of old breeders") +
-  scale_y_continuous(breaks=seq(0,0.10,0.02), limits=c(0,0.10))+
+  scale_y_continuous(breaks=seq(0,0.40,0.10), limits=c(0,0.40))+
   scale_x_continuous(breaks=seq(2005,2021,2), limits=c(2004,2021))+
   
   
