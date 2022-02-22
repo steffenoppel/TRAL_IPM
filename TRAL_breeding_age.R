@@ -173,7 +173,7 @@ goodyears<-contacts %>% group_by(Contact_Year) %>% summarise(n=length(unique(Bir
   mutate(all.pot.old=(old.ad+old.ch)) %>%
   mutate(all.pot.ad=cumsum(Adult), all.pot.ch=cumsum(Chick)) %>%
   mutate(all.pot.breed=dplyr::lag(all.pot.ch,n=4)+all.pot.ad) %>%
-  mutate(prop.pot.old=all.pot.old/all.pot.breed) %>%
+  mutate(prop.pot.old=all.pot.old/(all.pot.breed-all.pot.old)) %>%   ## changed denominator to all.not.old on advice from Adam Butler
   select(Contact_Year,n,Adult,Chick,N_marked,N_all,prop.seen,prop.pot.old)
 
 #filter(Contact_Year>1978)
@@ -243,11 +243,11 @@ oldbreeders<-contacts %>%
   left_join(goodyears, by="Contact_Year") %>%
   filter(Contact_Year>2003) 
 dim(oldbreeders)
-fwrite(oldbreeders,"TRAL_old_breeders_2004_2021.csv")
+#fwrite(oldbreeders,"TRAL_old_breeders_2004_2021.csv")
 
 ### analysis of trend over time
 
-m2oleff<-glm(cbind(n.old,n.young)~Contact_Year+offset(prop.pot.old), data=oldbreeders, family="binomial", weights=prop.seen)
+m2oleff<-glm(cbind(n.old,n.young)~Contact_Year+offset(log(prop.pot.old)), data=oldbreeders, family=binomial(link="cloglog"),weights=prop.seen)
 summary(m2oleff)
 str(m2oleff)
 m2oleff$fitted.values
