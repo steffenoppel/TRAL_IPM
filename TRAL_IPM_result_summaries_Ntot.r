@@ -40,11 +40,11 @@ library(magick)
 # LOAD MODEL OUTPUT FROM IPMs
 #########################################################################
 
-setwd("G:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+setwd("D:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 #load("TRAL_IPM_output_FINAL_REV2021.RData")
-load("TRAL_IPM_output_REV2022_FINAL_minage.RData")
+load("TRAL_IPM_output_REV2022_FINAL.RData")
 imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
 TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
@@ -54,7 +54,7 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 # PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
 #########################################################################
 ### workspace could not be saved with predictions
-summary_tralipm <- summary(TRALipm, vars=parameters[1:17])   ## remove IM
+summary_tralipm <- summary(TRALipm, vars=parameters[c(1:6,9,10,11,12)])   ## remove IM
 predictions <- data.frame(summary_tralipm,
                           parameter = row.names(summary_tralipm))
 predictions$parameter
@@ -64,7 +64,7 @@ predictions <- predictions[1:320,]  ## remove IM
 ## write output into file ##
 export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
   #filter(!grepl("Ntot.breed",parameter)) %>%
-  filter(!grepl("agebeta",parameter)) %>%
+  #filter(!grepl("agebeta",parameter)) %>%
   mutate(Year=c(
     rep(NA,3),         ## for mean phi and fec
     seq(2004,2021,1),   ## for breed.prop
@@ -121,6 +121,10 @@ bsout<-export %>% filter(demographic=="fecundity") %>% filter(!is.na(Year)) %>%
   select(Year,Median,Lower95,Upper95)
 summary(lm(Median~Year,data=bsout))
 range(bsout$Median, na.rm=T)
+
+### FINAL POPULATION SIZES ###
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.f[1,30]")
+
 
 
 #########################################################################
@@ -243,6 +247,69 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig2_revised.jpg", width=
 
 
 
+
+
+
+######################################################################################
+# FIGURE 3 CALCULATE PROBABILITY OF LAMBDA <1
+######################################################################################
+
+## get all mcmc samples for fut.growth.rate[1-3]
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[1]")
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[2]")
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[3]")
+
+## collate all samples
+fut.lam.samp<-data.frame()
+for(ch in 1:nc){
+  fut.lam.samp<-bind_rows(fut.lam.samp,as.data.frame((TRALipm$mcmc[[1]])[,23:25]))
+}
+head(fut.lam.samp)
+dim(fut.lam.samp)
+
+## PROBABILITY OF FUTURE GROWTH
+fut.lam.samp %>% gather(key="scenario",value="lam") %>% mutate(pos=ifelse(lam>1,1,0)) %>%
+  group_by(scenario) %>%
+  summarise(prob=sum(pos)/dim(fut.lam.samp)[1])
+
+
+## quantify probability of lambda>1
+fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,worse=`fut.growth.rate[3]`) %>%
+  mutate(comp12=ifelse(nochange<1,0,1),comp23=ifelse(erad<1,0,1),comp13=ifelse(worse<1,0,1)) %>%
+  summarise(prob12=mean(comp12),prob23=mean(comp23),prob13=mean(comp13))
+
+## plot histograms for future pop growth rate
+fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,worse=`fut.growth.rate[3]`) %>%
+  gather(key="Scenario",value="N") %>%
+  mutate(Scenario=if_else(Scenario=="erad", "after successful mouse eradication",if_else(Scenario=="worse","no mouse eradication and worsening impacts","no future change"))) %>%
+
+  ggplot(aes(x = N, fill = Scenario)) +                       # Draw overlaying histogram
+  geom_histogram(position = "identity", alpha = 0.2, bins = 80, aes(y = ..density..), color="black") +
+  geom_density(alpha=0.5) +
+  #geom_vline(aes(xintercept = 1), colour="indianred3", size=1) +
+  geom_segment(aes(x = 1, y = 0, xend = 1, yend = 50), colour="gray15", linetype = "dashed", size=1)+
+  
+  labs(x="Future population growth rate", y="Probability density",
+       fill="Scenario") +
+  scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
+  scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
+  
+  theme(panel.background=element_rect(fill="white", colour="black"), 
+        axis.text=element_text(size=18, color="black"), 
+        axis.title=element_text(size=20),
+        legend.text=element_text(size=12),
+        legend.title = element_text(size=14),
+        legend.position=c(0.14,0.88),
+        panel.grid.major = element_line(size=.1, color="grey94"),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(fill=NA, colour = "black"))
+
+
+#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_rev.jpg", width=14, height=8)
+
+
+
+
 #########################################################################
 # SUMMARY OF POPULATION SIZES
 #########################################################################
@@ -250,6 +317,19 @@ plot1_df %>% filter(Year==2050) %>% select(Scenario, Median, lcl,ucl) %>% mutate
 plot1_df %>% filter(Year==2004) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
 plot1_df %>% filter(Year==2021) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
 #fwrite(plot1_df,"TRAL_pop_projections_FINAL.csv")
+
+### FINAL POPULATION SIZES ###
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.f[2,30]")
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]")
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[18]")
+
+## collate all samples
+fut.pop.samp<-data.frame()
+for(ch in 1:nc){
+  fut.pop.samp<-bind_rows(fut.pop.samp,as.data.frame((TRALipm$mcmc[[ch]])[,61]))
+}
+median(fut.pop.samp$var1)*2
+
 
 #########################################################################
 # CALCULATE BENEFIT OF ERADICATION
@@ -272,6 +352,8 @@ plot1_df %>% filter(Year==2050) %>%
   mutate(benefit=median(Median)/min(Median),
          benefit.lcl=median(lcl)/min(lcl),
          benefit.ucl=median(ucl)/min(ucl))
+
+
 
 
 
@@ -387,65 +469,6 @@ Ntot.f.samp %>% select(-`Ntot[1]`) %>% rename(nochange=`Ntot.f[1,30]`,erad=`Ntot
 
 
 #ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS2_revised.jpg", width=14, height=8)
-
-
-
-######################################################################################
-# NOT USED SUPPLEMENTARY FIGURES: CALCULATE PROBABILITY OF LAMBDA <1
-######################################################################################
-
-
-
-## get all mcmc samples for fut.growth.rate[1-3]
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[1]")
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[2]")
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[3]")
-
-## collate all samples
-fut.lam.samp<-data.frame()
-for(ch in 1:nc){
-  fut.lam.samp<-bind_rows(fut.lam.samp,as.data.frame((TRALipm$mcmc[[1]])[,23:25]))
-}
-head(fut.lam.samp)
-dim(fut.lam.samp)
-
-## PROBABILITY OF FUTURE GROWTH
-fut.lam.samp %>% gather(key="scenario",value="lam") %>% mutate(pos=ifelse(lam>1,1,0)) %>%
-  group_by(scenario) %>%
-  summarise(prob=sum(pos)/dim(fut.lam.samp)[1])
-
-
-## quantify probability of lambda>1
-fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,worse=`fut.growth.rate[3]`) %>%
-  mutate(comp12=ifelse(nochange<1,0,1),comp23=ifelse(erad<1,0,1),comp13=ifelse(worse<1,0,1)) %>%
-  summarise(prob12=mean(comp12),prob23=mean(comp23),prob13=mean(comp13))
-
-## plot histograms for future pop after 30 years
-fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,worse=`fut.growth.rate[3]`) %>%
-  gather(key="Scenario",value="N") %>%
-  mutate(Scenario=if_else(Scenario=="erad", "eradication",if_else(Scenario=="worse","worse impacts","no change"))) %>%
-  
-  ggplot(aes(x = N, fill = Scenario)) +                       # Draw overlaying histogram
-  geom_histogram(position = "identity", alpha = 0.2, bins = 80, aes(y = ..density..), color="black") +
-  geom_density(alpha=0.5) +
-  geom_vline(aes(xintercept = 1), colour="indianred3", size=1) +
-  labs(x="Future population growth rate", y="Probability density",
-       fill="Scenario") +
-  scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
-  scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
-  
-  theme(panel.background=element_rect(fill="white", colour="black"), 
-        axis.text=element_text(size=18, color="black"), 
-        axis.title=element_text(size=20),
-        legend.text=element_text(size=12),
-        legend.title = element_text(size=14),
-        legend.position=c(0.14,0.88),
-        panel.grid.major = element_line(size=.1, color="grey94"),
-        panel.grid.minor = element_blank(),
-        panel.border = element_rect(fill=NA, colour = "black"))
-
-
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS6.jpg", width=14, height=8)
 
 
 
