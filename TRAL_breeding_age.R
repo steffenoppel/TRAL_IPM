@@ -249,6 +249,15 @@ dim(oldbreeders)
 
 m2oleff<-glm(cbind(n.old,n.young)~Contact_Year+offset(log(prop.pot.old)), data=oldbreeders, family=binomial(link="cloglog"),weights=prop.seen)
 summary(m2oleff)
+
+
+### Sarah suggested different approach:
+m1<-glm(cbind(n.old,n.young)~Contact_Year+prop.pot.old, data=oldbreeders, family=binomial(link="cloglog"),weights=prop.seen)
+m2<-glm(cbind(n.old,n.young)~prop.pot.old, data=oldbreeders, family=binomial(link="cloglog"),weights=prop.seen)
+m1$aic
+m2$aic
+
+
 str(m2oleff)
 m2oleff$fitted.values
 ### prediction of effect size
