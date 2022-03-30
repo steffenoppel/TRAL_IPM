@@ -346,6 +346,24 @@ contacts<-fixed_contacts %>%
 dim(contacts)
 unique(contacts$FIRST_AGE)
 
+### HOW MANY BIRDS WERE RECORDED BEFORE THE AGE OF 4?
+## only 15 of the 49 were later seen again - so juv surv will be biased if we drop these contacts
+## remove individuals instead
+# youngrecruits<-contacts %>% filter(ContAge %in% c(2,3))
+# length(unique(youngrecruits$BirdID))
+# min(youngrecruits$Contact_Year)
+# youngrecruitsEH<-contacts %>% filter(BirdID %in% youngrecruits$BirdID) %>% group_by(BirdID, ContAge) %>%
+#   summarise(AGE=last(MAX_AGE, na.rm=T)) %>%
+#   spread(key=ContAge, value=AGE) %>%
+#   rowwise() %>% mutate(TOT=sum(c_across(5:22), na.rm=T)) %>%
+#   filter(TOT>0)
+# youngrecruitsEH
+# removebirds<-unique(youngrecruits$BirdID)[!(unique(youngrecruits$BirdID) %in% youngrecruitsEH$BirdID)] 
+# 
+# contacts<-contacts %>%
+#   filter(ContAge!=3) %>%     ## remove contacts at age 3 for birds later seen again
+#   filter(!(BirdID %in% removebirds))   ## remove birds that were only ever observed at age 2 or 3
+# dim(contacts)
 
 ## try to determine years with high and low detection probability
 
@@ -703,4 +721,4 @@ TRAL.pop %>% ungroup() %>%
 ##   11. SAVE WORKSPACE ###############
 #############################################################################
 setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
-save.image("TRAL_IPM_input.marray.REV2022.RData")
+save.image("TRAL_IPM_input.marray.REV2022red.RData")
