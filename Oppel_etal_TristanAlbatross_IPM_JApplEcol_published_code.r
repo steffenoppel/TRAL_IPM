@@ -205,7 +205,7 @@ model {
     
     for(age in 7:30) {
       IM[1,age,1] ~ dbin(pow(mean.phi.ad,(age-1)), round(IM[1,age-1,3]))
-      IM[1,age,2] <- IM[1,age,1]*p.juv.recruit.f[age]
+      IM[1,age,2] ~ dbin(p.juv.recruit.f[age],round(IM[1,age,1]))
       IM[1,age,3] <- IM[1,age,1] - IM[1,age,2]
     }
     N.recruits[1] <- sum(IM[1,,2])  ### number of this years recruiters - irrelevant in year 1 as already included in Ntot.breed prior
@@ -248,7 +248,7 @@ model {
     
     for(age in 4:30) {
       IM[tt,age,1] ~ dbin(phi.ad[tt+24], max(1,round(IM[tt-1,age-1,3])))
-      IM[tt,age,2] <- min(round(IM[tt,age-1,3]),IM[tt,age,1])*p.juv.recruit[age,tt]
+      IM[tt,age,2] ~ dbin(p.juv.recruit[age,tt],round(IM[tt,age,1]))
       IM[tt,age,3] <- IM[tt,age,1] - IM[tt,age,2]
     }
     N.recruits[tt] <- sum(IM[tt,,2])  ### number of this years recruiters
@@ -395,7 +395,7 @@ model {
 
     for(age in 4:30) {
       IM.f[scen,1,age,1] ~ dbin(mean.phi.ad, max(1,round(IM[T,age-1,3])))
-      IM.f[scen,1,age,2] <- min(round(IM[T,age-1,3]),IM.f[scen,1,age,1])*p.juv.recruit.f[age]
+      IM.f[scen,1,age,2] ~ dbin(p.juv.recruit.f[age],round(IM.f[scen,1,age,1]))
       IM.f[scen,1,age,3]   <- IM.f[scen,1,age,1] - IM.f[scen,1,age,2]
     }
     N.recruits.f[scen,1] <- sum(IM.f[scen,1,,2])  ### number of this years recruiters
@@ -434,18 +434,18 @@ model {
       IM.f[scen,tt,1,2] <- 0
       IM.f[scen,tt,1,3] <- IM.f[scen,tt,1,1] - IM.f[scen,tt,1,2]
     
-    for(age in 2:30) {
+    for(age in 2:3) {
+      IM.f[scen,tt,age,1] ~ dbin(mean.phi.ad, max(1,round(IM.f[scen,tt-1,age-1,3])))
+      IM.f[scen,tt,age,2] <- 0
+      IM.f[scen,tt,age,3] <- IM.f[scen,tt,age,1] - IM.f[scen,tt,age,2]
+    }
+    
+    for(age in 4:30) {
       IM.f[scen,tt,age,1] ~ dbin(mean.phi.ad, max(1,round(IM.f[scen,tt-1,age-1,3])))
       IM.f[scen,tt,age,2] ~ dbin(p.juv.recruit.f[age], round(IM.f[scen,tt,age,1]))
       IM.f[scen,tt,age,3] <- IM.f[scen,tt,age,1] - IM.f[scen,tt,age,2]
     }
-    
-    # for(age in 2:30) {
-    #   IM.f[scen,tt,age,1] ~ dbin(mean.phi.ad, max(1,round(IM.f[scen,tt-1,age-1,3])))
-    #   IM.f[scen,tt,age,2] <- min(round(IM.f[scen,tt-1,age-1,3]),IM.f[scen,tt,age,1])*p.juv.recruit.f[age]
-    #   IM.f[scen,tt,age,3] <- IM.f[scen,tt,age,1] - IM.f[scen,tt,age,2]
-    # }
-    N.recruits.f[scen,tt] <- sum(IM.f[scen,tt,4:30,2])  ### number of this years recruiters
+    N.recruits.f[scen,tt] <- sum(IM.f[scen,tt,,2])  ### number of this years recruiters
     
     ## THE BREEDING POPULATION ##
     N.ad.surv.f[scen,tt] ~ dbin(fut.surv.change[tt,scen]*mean.phi.ad, round((Ntot.breed.f[scen,tt-1]-N.succ.breed.f[scen,tt-1])+N.atsea.f[scen,tt-1]))           ### previous year's adults that survive
@@ -504,10 +504,10 @@ parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
 
 # MCMC settings
 nt <- 10
-nb <- 2500
-nad <- 2000
+nb <- 25000
+nad <- 20000
 nc <- 3
-ns <- 20000
+ns <- 200000
 
 # RUN THE MODEL (took 3 days for ns=200000)
 TRALipm <- run.jags(data=jags.data, inits=inits, parameters, 
