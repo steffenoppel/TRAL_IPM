@@ -226,8 +226,8 @@ dim(adult.marray)
 # use 3 rather than just 2 parameters, with higher probability after 2009
 # abandoned this approach on 24 Jan 2022 because survival estimates are wonky
 #goodyears$p.sel<-ifelse(goodyears$p.sel==2 & goodyears$Contact_Year>2008,3,goodyears$p.sel)
-goodyears$p.sel<-ifelse(goodyears$p.sel==3,2,goodyears$p.sel)
-goodyears$bycatch<-ifelse(goodyears$Contact_Year<2006,2,1)
+#goodyears$p.sel<-ifelse(goodyears$p.sel==3,2,goodyears$p.sel)
+#goodyears$bycatch<-ifelse(goodyears$Contact_Year<2006,2,1)
 goodyears$p.sel<-ifelse(goodyears$Contact_Year<2004,1,ifelse(goodyears$Contact_Year==2001,1,2)) ### re-calibrated which year has good and poor coverage
 
 
@@ -718,7 +718,7 @@ rm(list=setdiff(ls(), c("parameters","jags.data","inits","n.years","n.sites")))
 gc()
 
 nt <- 10
-nb <- 25000
+nb <- 250000
 nad <- 20000
 nc <- 3
 ns <- 200000 #longest
