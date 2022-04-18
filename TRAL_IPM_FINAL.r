@@ -706,11 +706,11 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
  
 
 # Parameters monitored
-parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","breed.prop",
-                "pop.growth.rate","fut.growth.rate","lambda",
-                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",   ## added Ntot.breed to provide better contrast with Ntot?
-                #new
-                "ann.fec", "mean.p.juv","mean.p.ad","p.ad")#
+parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
+                "mean.recruit","pop.growth.rate","fut.growth.rate",
+                "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",
+                "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
+                "mean.p.sd","sigma.p","sigma.phi")
                 #"p.juv","IM","N.breed.ready","N.recruits","N.atsea","p.juv.recruit") ## added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE

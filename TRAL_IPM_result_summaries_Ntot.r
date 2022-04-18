@@ -40,7 +40,7 @@ library(magick)
 # LOAD MODEL OUTPUT FROM IPMs
 #########################################################################
 
-setwd("D:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
+setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 #load("TRAL_IPM_output_FINAL_REV2021.RData")
@@ -53,12 +53,14 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 #########################################################################
 # PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
 #########################################################################
-### workspace could not be saved with predictions
-summary_tralipm <- summary(TRALipm, vars=parameters[c(1:6,9,10,11,12)])   ## remove IM
+
+## based on the parameters defined in the published code
+
+summary_tralipm <- summary(TRALipm, vars=parameters[c(1:3,6,7,9,10,11,12,13,14)])   ## remove sigmas and others we don't need
 predictions <- data.frame(summary_tralipm,
                           parameter = row.names(summary_tralipm))
 predictions$parameter
-predictions <- predictions[1:320,]  ## remove IM
+
 
 
 ## write output into file ##
@@ -67,16 +69,16 @@ export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
   #filter(!grepl("agebeta",parameter)) %>%
   mutate(Year=c(
     rep(NA,3),         ## for mean phi and fec
-    seq(2004,2021,1),   ## for breed.prop
+    #seq(2004,2021,1),   ## for breed.prop
     rep(NA,4),         ## for growth rates
-    #seq(2004,2020,1), ##  for lambda 
+    #seq(2004,2020,1), ##  for lambda
     seq(2004,2021,1),   ## for N.tot
     rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
     seq(2004,2021,1),   ## for Ntot.breed
     rep(seq(1979,2021,1), 2), ##  for phi.ad and phi.juv
-    seq(2004,2021,1),   ## for ann.fec
-    rep(NA,4),         ## for mean p
-    seq(1979,2021,1) ##  for p.ad
+    seq(2004,2021,1)   ## for ann.fec
+    #rep(NA,4),         ## for mean p
+    #seq(1979,2021,1) ##  for p.ad
   )) %>%     ## for deviance and agebeta
   mutate(demographic=parameter) %>%
   mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
@@ -87,9 +89,8 @@ export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
   rename(Rhat=psrf) %>%
   arrange(demographic,Year)
 tail(export)
-hist(export$Rhat)
-hist(export$SSeff)
 
+## assess convergence and sample size
 summary(export$Rhat)
 summary(export$SSeff)
 
@@ -107,10 +108,10 @@ jags.data$R[jags.data$R<1000]<-NA
 summary(lm(jags.data$R~seq(2004,2021,1)))
 range(jags.data$R, na.rm=T)
 
-bsout<-export %>% filter(grepl("Ntot.breed",parameter)) %>% 
-  select(Year,Median,Lower95,Upper95)
-summary(lm(Median~Year,data=bsout))
-range(bsout$Median, na.rm=T)
+# bsout<-export %>% filter(grepl("Ntot.breed",parameter)) %>% 
+#   select(Year,Median,Lower95,Upper95)
+# summary(lm(Median~Year,data=bsout))
+# range(bsout$Median, na.rm=T)
 
 
 ##change in breeding success
@@ -126,6 +127,13 @@ range(bsout$Median, na.rm=T)
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.f[1,30]")
 
 
+### POPULATION SIZES IN RESULTS SECTION ###
+(export %>% filter(parameter %in% c("Ntot[1]","Ntot[18]")) %>% select(Median, Lower95,Upper95)) *2
+(export %>% filter(parameter %in% c("Ntot.f[2,30]")) %>% select(Median, Lower95,Upper95)) *2
+
+export %>% filter(demographic=="fecundity") %>% select(Year, Median, Lower95,Upper95) %>% arrange(Median)
+
+
 
 #########################################################################
 # PRODUCE TABLE 1 THAT SUMMARISES DEMOGRAPHIC RATES
@@ -133,15 +141,20 @@ which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.f[1,30]")
 
 TABLE1<-export %>% 
   filter(!grepl("Ntot",parameter)) %>%
-  filter(parameter %in% c("fut.growth.rate[1]",
-                          "fut.growth.rate[2]",
-                          "fut.growth.rate[3]",
+  filter(parameter %in% c("mean.phi.ad",
+                          "mean.phi.juv",
                           "mean.fec",
+                          "pop.growth.rate",
+                          "fut.growth.rate[1]",
+                          "fut.growth.rate[2]",
+                          "fut.growth.rate[3]"
                           #"mean.propensity",
                           #"mean.recruit",
-                          "pop.growth.rate",
-                          "mean.phi.ad",
-                          "mean.phi.juv" )) 
+                           )) %>%
+  mutate(order=c(3,4,5,6,7,1,2)) %>%
+  arrange(order) %>%
+  mutate(CredInt=paste(round(Lower95,3), "-", round(Upper95,3))) %>%
+  select(parameter,Median,CredInt,Lower95,Upper95)
 
 #write.table(TABLE1,"TRAL_demographic_estimates_2022.csv", sep=",", row.names=F)
 
@@ -150,7 +163,7 @@ TABLE1<-export %>%
 
 
 #########################################################################
-# PRODUCE OUTPUT GRAPH THAT SHOWS ESTIMATES FOR POPULATION TREND
+# PRODUCE OUTPUT GRAPH FIGURE 2 THAT SHOWS ESTIMATES FOR POPULATION TREND
 #########################################################################
 ## INCLUDED DIFFERENT SCENARIOS ON 22 APRIL 2020
 ## scenario 1: projection with no changes in demography
@@ -200,14 +213,14 @@ ggplot(plot1_df) +
        linetype="Breeding population") +
   
   ### add the bird icons
-  annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=12000, ymax=18000) +
+  annotation_custom(TRALicon, xmin=2045, xmax=2050, ymin=15000, ymax=21000) +
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
         axis.title=element_text(size=20),
         legend.text=element_text(size=14),
         legend.title = element_text(size=16),
-        legend.position=c(0.26,0.82),
+        legend.position=c(0.21,0.82),
         panel.grid.major = element_line(size=.1, color="grey94"),
         #panel.grid.major.y = element_line(size=.1, color="grey37"), 
         #panel.grid.major.x = element_blank(), 
@@ -251,7 +264,7 @@ ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig2_revised.jpg", width=
 
 
 ######################################################################################
-# FIGURE 3 CALCULATE PROBABILITY OF LAMBDA <1
+# FIGURE 3 SHOWING PROBABILITY OF LAMBDA <1
 ######################################################################################
 
 ## get all mcmc samples for fut.growth.rate[1-3]
@@ -262,7 +275,7 @@ which(dimnames(TRALipm$mcmc[[1]])[[2]]=="fut.growth.rate[3]")
 ## collate all samples
 fut.lam.samp<-data.frame()
 for(ch in 1:nc){
-  fut.lam.samp<-bind_rows(fut.lam.samp,as.data.frame((TRALipm$mcmc[[1]])[,23:25]))
+  fut.lam.samp<-bind_rows(fut.lam.samp,as.data.frame((TRALipm$mcmc[[1]])[,5:7]))
 }
 head(fut.lam.samp)
 dim(fut.lam.samp)
@@ -305,7 +318,7 @@ fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,
         panel.border = element_rect(fill=NA, colour = "black"))
 
 
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_rev.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_revised.jpg", width=16, height=8)
 
 
 
@@ -313,7 +326,7 @@ fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,
 #########################################################################
 # SUMMARY OF POPULATION SIZES
 #########################################################################
-plot1_df %>% filter(Year==2050) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
+plot1_df %>% filter(Year==2051) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
 plot1_df %>% filter(Year==2004) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
 plot1_df %>% filter(Year==2021) %>% select(Scenario, Median, lcl,ucl) %>% mutate(Median=Median*2, lcl=lcl*2,ucl=ucl*2)
 #fwrite(plot1_df,"TRAL_pop_projections_FINAL.csv")
@@ -324,11 +337,11 @@ which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]")
 which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[18]")
 
 ## collate all samples
-fut.pop.samp<-data.frame()
-for(ch in 1:nc){
-  fut.pop.samp<-bind_rows(fut.pop.samp,as.data.frame((TRALipm$mcmc[[ch]])[,61]))
-}
-median(fut.pop.samp$var1)*2
+# fut.pop.samp<-data.frame()
+# for(ch in 1:nc){
+#   fut.pop.samp<-bind_rows(fut.pop.samp,as.data.frame((TRALipm$mcmc[[ch]])[,61]))
+# }
+# median(fut.pop.samp$var1)*2
 
 
 #########################################################################
@@ -365,7 +378,7 @@ bsout<-bsout %>% filter(Year<2022)
 
 ## CREATE PLOT FOR POP TREND AND SAVE AS PDF
 ggplot(bsout) + 
-  geom_point(aes(y=Median, x=Year), size=2, colour="firebrick")+   #
+  geom_point(aes(y=Median, x=Year), size=2, colour="black")+   #
   geom_errorbar(aes(ymin=Lower95, ymax=Upper95, x=Year), width=0.2)+   #
   geom_smooth(aes(y=Median, x=Year),method="lm",se=T,col="grey12", size=1)+
   ylab("Breeding success of Tristan Albatross") +
@@ -387,7 +400,7 @@ ggplot(bsout) +
         #panel.border = element_blank(),
         panel.grid.minor = element_blank())
 
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS1_rev.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS1_rev.jpg", width=14, height=8)
 
 
 
@@ -412,7 +425,7 @@ which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot[1]")
 ## collate all samples
 Ntot.f.samp<-data.frame()
 for(ch in 1:nc){
-  Ntot.f.samp<-bind_rows(Ntot.f.samp,as.data.frame((TRALipm$mcmc[[ch]])[,c(44,149:151)]))
+  Ntot.f.samp<-bind_rows(Ntot.f.samp,as.data.frame((TRALipm$mcmc[[ch]])[,c(9,114:116)]))
 }
 head(Ntot.f.samp)
 dim(Ntot.f.samp)
@@ -468,7 +481,7 @@ Ntot.f.samp %>% select(-`Ntot[1]`) %>% rename(nochange=`Ntot.f[1,30]`,erad=`Ntot
         panel.border = element_rect(fill=NA, colour = "black"))
 
 
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS2_revised.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS2_revised.jpg", width=14, height=8)
 
 
 
@@ -568,7 +581,7 @@ ggplot() + geom_point(aes(y=lambda,x=value)) +
         panel.grid.minor = element_blank(), 
         panel.border = element_blank())
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3_rev.jpg", width=14, height=8)
+#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3_rev.jpg", width=14, height=8)
 
 
 
