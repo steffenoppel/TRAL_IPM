@@ -709,8 +709,8 @@ inits <- function(){list(mean.phi.ad = runif(1, 0.7, 0.97),
 parameters <- c("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity",
                 "mean.recruit","pop.growth.rate","fut.growth.rate",
                 "agebeta","Ntot","Ntot.f","phi.ad","phi.juv","Ntot.breed",
-                "ann.fec", "sigma.obs", "mean.p.juv","mean.p.ad",
-                "mean.p.sd","sigma.p","sigma.phi")
+                "ann.fec", #"sigma.obs", "mean.p.juv","mean.p.ad",
+                "breed.prop","lambda")
                 #"p.juv","IM","N.breed.ready","N.recruits","N.atsea","p.juv.recruit") ## added IM and JUV to facilitate LTRE analysis
 
 ### REDUCE WORKSPACE SIZE
