@@ -304,21 +304,23 @@ fut.lam.samp %>% rename(nochange=`fut.growth.rate[1]`,erad=`fut.growth.rate[2]`,
   
   labs(x="Future population growth rate", y="Probability density",
        fill="Scenario") +
+  guides(fill = guide_legend(reverse=TRUE)) +
   scale_fill_viridis_d(alpha=0.3,begin=0,end=0.98,direction=1) +
   scale_color_viridis_d(alpha=1,begin=0,end=0.98,direction=1) +
+  scale_x_continuous(breaks=seq(0.9,1.04,0.01), limits=c(0.9,1.04))+
   
   theme(panel.background=element_rect(fill="white", colour="black"), 
         axis.text=element_text(size=18, color="black"), 
         axis.title=element_text(size=20),
         legend.text=element_text(size=12),
         legend.title = element_text(size=14),
-        legend.position=c(0.14,0.88),
+        legend.position="top", ##c(0.14,0.88),
         panel.grid.major = element_line(size=.1, color="grey94"),
         panel.grid.minor = element_blank(),
         panel.border = element_rect(fill=NA, colour = "black"))
 
 
-ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_revised.jpg", width=16, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\Fig3_revised.jpg", width=14, height=8)
 
 
 
