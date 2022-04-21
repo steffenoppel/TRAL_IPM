@@ -18,12 +18,7 @@
 
 # updated 21 Dec 2021 to include revision suggestion by referees
 
-### TO DO LIST
-# (1) the probability that the given management scenario would result in a larger population size in 2050 relative to the size predicted with no change
-# (2) cumulative probability of annual population extinction (or quasi-extinction if a threshold other than zero is of interest) under each scenario
-# (3) the probability that future lambda is >1
-# (4) the probability that pop in 2050 is greater than pop in 2004
-# Plot of correlation between lambda and demographic estimates (phi.ad, phi.juv, p.ad, ann.fec)
+# finalised script on 21 April 2022
 
 library(tidyverse)
 library(jagsUI)
@@ -44,7 +39,7 @@ setwd("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\ANALYSIS\\PopulationModel\\TRAL_IPM")
 #load("TRAL_IPM_output_2020.RData")
 #load("TRAL_IPM_output_v5_Ntot_agerecruit.RData")
 #load("TRAL_IPM_output_FINAL_REV2021.RData")
-load("TRAL_IPM_output_REV2022_FINAL.RData")
+load("TRAL_IPM_output_REV2022_FINAL_minage.RData")
 imgTRAL<-image_read("C:\\STEFFEN\\RSPB\\UKOT\\Gough\\PR_Comms\\Icons\\alby 4.jpg") %>% image_transparent("white", fuzz=5)
 TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 
@@ -53,48 +48,48 @@ TRALicon <- rasterGrob(imgTRAL, interpolate=TRUE)
 #########################################################################
 # PRODUCE OUTPUT TABLES THAT COMBINE ALL 3 SCENARIOS
 #########################################################################
-
-## based on the parameters defined in the published code
-
-summary_tralipm <- summary(TRALipm, vars=parameters[c(1:3,6,7,9,10,11,12,13,14)])   ## remove sigmas and others we don't need
-predictions <- data.frame(summary_tralipm,
-                          parameter = row.names(summary_tralipm))
-predictions$parameter
-
-
-
-## write output into file ##
-export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
-  #filter(!grepl("Ntot.breed",parameter)) %>%
-  #filter(!grepl("agebeta",parameter)) %>%
-  mutate(Year=c(
-    rep(NA,3),         ## for mean phi and fec
-    #seq(2004,2021,1),   ## for breed.prop
-    rep(NA,4),         ## for growth rates
-    #seq(2004,2020,1), ##  for lambda
-    seq(2004,2021,1),   ## for N.tot
-    rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
-    seq(2004,2021,1),   ## for Ntot.breed
-    rep(seq(1979,2021,1), 2), ##  for phi.ad and phi.juv
-    seq(2004,2021,1)   ## for ann.fec
-    #rep(NA,4),         ## for mean p
-    #seq(1979,2021,1) ##  for p.ad
-  )) %>%     ## for deviance and agebeta
-  mutate(demographic=parameter) %>%
-  mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
-  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
-  mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
-  mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
-  mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
-  rename(Rhat=psrf) %>%
-  arrange(demographic,Year)
-tail(export)
-
-## assess convergence and sample size
-summary(export$Rhat)
-summary(export$SSeff)
-
-#write.table(export,"TRAL_Gough_IPM_estimates_2022.csv", sep=",", row.names=F)
+# ALL SAVED IN WORKSPACE
+# ## based on the parameters defined in the published code
+# 
+# summary_tralipm <- summary(TRALipm, vars=parameters[c(1:3,6,7,9,10,11,12,13,14)])   ## remove sigmas and others we don't need
+# predictions <- data.frame(summary_tralipm,
+#                           parameter = row.names(summary_tralipm))
+# predictions$parameter
+# 
+# 
+# 
+# ## write output into file ##
+# export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
+#   #filter(!grepl("Ntot.breed",parameter)) %>%
+#   #filter(!grepl("agebeta",parameter)) %>%
+#   mutate(Year=c(
+#     rep(NA,3),         ## for mean phi and fec
+#     #seq(2004,2021,1),   ## for breed.prop
+#     rep(NA,4),         ## for growth rates
+#     #seq(2004,2020,1), ##  for lambda
+#     seq(2004,2021,1),   ## for N.tot
+#     rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
+#     seq(2004,2021,1),   ## for Ntot.breed
+#     rep(seq(1979,2021,1), 2), ##  for phi.ad and phi.juv
+#     seq(2004,2021,1)   ## for ann.fec
+#     #rep(NA,4),         ## for mean p
+#     #seq(1979,2021,1) ##  for p.ad
+#   )) %>%     ## for deviance and agebeta
+#   mutate(demographic=parameter) %>%
+#   mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
+#   mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
+#   mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
+#   mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
+#   mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
+#   rename(Rhat=psrf) %>%
+#   arrange(demographic,Year)
+# tail(export)
+# 
+# ## assess convergence and sample size
+# summary(export$Rhat)
+# summary(export$SSeff)
+# 
+# #write.table(export,"TRAL_Gough_IPM_estimates_2022.csv", sep=",", row.names=F)
 
 
 
@@ -500,29 +495,29 @@ str(TRALipm$mcmc)
 ############ PLOT RAW CORRELATIONS BETWEEN DEMOGRAPHIC PARAMETERS #####
 ### need the following parameters from model
 ## # Step 1: Using the JAGS output (named TRALipm$mcmc),         # compute realized population growth rates for Tristan Albatross 
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[1]") # lambda: 26-42
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[43]") # phi.ad: 177-194
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.juv[43]") # phi.juv: 220-237
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[1]") # ann.fec: 256 - 273
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="breed.prop[18]") # breed.prop: 4-21
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[18]") # Ntot.breed: 238-255
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="lambda[17]") # lambda: 256-272
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.ad[26]") # phi.ad: 142-159
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="phi.juv[26]") # phi.juv: 185-202
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="ann.fec[18]") # ann.fec: 221 - 238
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="breed.prop[2]") # breed.prop: 239-255
+which(dimnames(TRALipm$mcmc[[1]])[[2]]=="Ntot.breed[1]") # Ntot.breed: 203-220
 library(matrixStats)
-lam <- as.matrix(TRALipm$mcmc[[1]][,c(26:42)])
-Sa <- as.matrix(TRALipm$mcmc[[1]][,c(177:194)])
-Sj <- as.matrix(TRALipm$mcmc[[1]][,c(220:237)])
-Fec <- as.matrix(TRALipm$mcmc[[1]][,c(256:273)])
-Bp <- as.matrix(TRALipm$mcmc[[1]][,c(238:255)])
-breed.prop <- as.matrix(TRALipm$mcmc[[1]][,c(4:21)])
+lam <- as.matrix(TRALipm$mcmc[[1]][,c(256:272)])
+Sa <- as.matrix(TRALipm$mcmc[[1]][,c(142:159)])
+Sj <- as.matrix(TRALipm$mcmc[[1]][,c(185:202)])
+Fec <- as.matrix(TRALipm$mcmc[[1]][,c(221:238)])
+Bp <- as.matrix(TRALipm$mcmc[[1]][,c(203:220)])
+breed.prop <- as.matrix(TRALipm$mcmc[[1]][,c(239:255)])
 
 
 # Account for different start of time series for survival and fecundity data
 for(ch in 2:nc){
-  lam<-rbind(lam,as.matrix(TRALipm$mcmc[[ch]][,c(26:42)]))
-  Sa<-rbind(Sa,as.matrix(TRALipm$mcmc[[ch]][,c(177:194)]))  ## only for the years coinciding with the fecundity and pop size
-  Sj<-rbind(Sj,as.matrix(TRALipm$mcmc[[ch]][,c(220:237)]))  ## only for the years coinciding with the fecundity and pop size
-  Fec<-rbind(Fec,as.matrix(TRALipm$mcmc[[ch]][,c(256:273)]))  ## without the last year for which no lambda is available
-  Bp<-rbind(Bp,as.matrix(TRALipm$mcmc[[ch]][,c(238:255)]))  ## only for the years coinciding with the fecundity and pop size
-  breed.prop<-rbind(breed.prop,as.matrix(TRALipm$mcmc[[ch]][,c(4:21)]))  ## only for the years coinciding with the fecundity and pop size
+  lam<-rbind(lam,as.matrix(TRALipm$mcmc[[ch]][,c(256:272)]))
+  Sa<-rbind(Sa,as.matrix(TRALipm$mcmc[[ch]][,c(142:159)]))  ## only for the years coinciding with the fecundity and pop size
+  Sj<-rbind(Sj,as.matrix(TRALipm$mcmc[[ch]][,c(185:202)]))  ## only for the years coinciding with the fecundity and pop size
+  Fec<-rbind(Fec,as.matrix(TRALipm$mcmc[[ch]][,c(221:238)]))  ## without the last year for which no lambda is available
+  Bp<-rbind(Bp,as.matrix(TRALipm$mcmc[[ch]][,c(203:220)]))  ## only for the years coinciding with the fecundity and pop size
+  breed.prop<-rbind(breed.prop,as.matrix(TRALipm$mcmc[[ch]][,c(239:255)]))  ## only for the years coinciding with the fecundity and pop size
 }
 
 
@@ -532,7 +527,7 @@ corplot.f<-data.frame(parm=dimnames(Fec)[[2]],value=colMeans(Fec),Year=c(2004:20
 corplot.Sa<-data.frame(parm=dimnames(Sa)[[2]],value=colMeans(Sa),Year=c(2004:2021),dem="Adult survival",lcl=apply(Sa,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sa,2,quantile,probs = 0.975, na.rm = TRUE))
 corplot.Sj<-data.frame(parm=dimnames(Sj)[[2]],value=colMeans(Sj),Year=c(2004:2021),dem="Juvenile survival",lcl=apply(Sj,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Sj,2,quantile,probs = 0.975, na.rm = TRUE))
 corplot.Bp<-data.frame(parm=dimnames(Bp)[[2]],value=colMeans(Bp),Year=c(2004:2021),dem="N breeding pairs",lcl=apply(Bp,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(Bp,2,quantile,probs = 0.975, na.rm = TRUE))
-corplot.breed.prop<-data.frame(parm=dimnames(breed.prop)[[2]],value=colMeans(breed.prop),Year=c(2004:2021),dem="Breeding propensity",lcl=apply(breed.prop,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(breed.prop,2,quantile,probs = 0.975, na.rm = TRUE))
+corplot.breed.prop<-data.frame(parm=dimnames(breed.prop)[[2]],value=colMeans(breed.prop),Year=c(2005:2021),dem="Breeding propensity",lcl=apply(breed.prop,2,quantile,probs = 0.025, na.rm = TRUE),ucl=apply(breed.prop,2,quantile,probs = 0.975, na.rm = TRUE))
 
 
 corplot<-bind_rows(corplot.f,corplot.Sa,corplot.Sj,corplot.Bp,corplot.breed.prop) %>% filter(Year<2021) %>%
@@ -552,8 +547,8 @@ test.vals$text[3]<-paste("r = ",round(ct.Sj$estimate,2)," (",round(ct.Sj$conf.in
 ct.Bp<-cor.test(corplot.l$lambda,corplot.Bp$value[corplot.Bp$Year<2021])
 test.vals$text[4]<-paste("r = ",round(ct.Bp$estimate,2)," (",round(ct.Bp$conf.int[1],2),", ",round(ct.Bp$conf.int[2],2),")", sep="")
 
-ct.breed.prop<-cor.test(corplot.l$lambda,corplot.breed.prop$value[corplot.breed.prop$Year<2021])
-#test.vals$text[5]<-paste("r = ",round(ct.breed.prop$estimate,2)," (",round(ct.breed.prop$conf.int[1],2),", ",round(ct.breed.prop$conf.int[2],2),")", sep="")
+#ct.breed.prop<-cor.test(corplot.l$lambda,corplot.breed.prop$value)
+#test.vals$text[2]<-paste("r = ",round(ct.breed.prop$estimate,2)," (",round(ct.breed.prop$conf.int[1],2),", ",round(ct.breed.prop$conf.int[2],2),")", sep="")
 
 
 ## create PLOT
@@ -581,9 +576,10 @@ ggplot() + geom_point(aes(y=lambda,x=value)) +
         axis.title=element_text(size=16), 
         panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
+	  plot.margin = unit(c(0.2,1,0.2,0.2), "cm"),
         panel.border = element_blank())
 
-#ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3_rev.jpg", width=14, height=8)
+ggsave("C:\\STEFFEN\\MANUSCRIPTS\\Submitted\\TRAL_IPM\\FigS3_revised.jpg", width=14, height=8)
 
 
 

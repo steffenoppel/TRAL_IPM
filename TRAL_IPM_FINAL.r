@@ -71,6 +71,8 @@
 
 ## 17 February 2022: revised model to avoid breeding before 4 years of age
 
+## 21 April - finalised script after final run
+
 library(tidyverse)
 library(lubridate)
 library(data.table)
@@ -735,37 +737,86 @@ str(TRALipm)
 #########################################################################
 # SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
 #########################################################################
-### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
-### monitoring IM and JUV makes this workspace way too large to save
-### writing output files one by one
 
-## updated script for 'runjags' output
-
-for(p in parameters){
-summary_tralipm <- summary(TRALipm, vars=p)   ### ("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity", "mean.recruit",)does not run for all variables if IM is included
+summary_tralipm <- summary(TRALipm, vars=parameters[c(1:3,6,7,9,10,11,12,13,14)])   ## remove sigmas and others we don't need
 predictions <- data.frame(summary_tralipm,
                           parameter = row.names(summary_tralipm))
-#summary_tralipm_df <- as.data.frame(summary_tralipm)
-fwrite(predictions, sprintf("IPM_output_%s.csv",p))
-}
+predictions$parameter
 
 
 
-#### FOR IM the above does not work
+## write output into file ##
+export<-predictions %>% filter(!grepl("lambda",parameter)) %>%
+  #filter(!grepl("Ntot.breed",parameter)) %>%
+  #filter(!grepl("agebeta",parameter)) %>%
+  mutate(Year=c(
+    rep(NA,3),         ## for mean phi and fec
+    #seq(2004,2021,1),   ## for breed.prop
+    rep(NA,4),         ## for growth rates
+    #seq(2004,2020,1), ##  for lambda
+    seq(2004,2021,1),   ## for N.tot
+    rep(seq(2022,2051,1),each=3), ##  for Ntot.f with 3 scenarios
+    seq(2004,2021,1),   ## for Ntot.breed
+    rep(seq(1979,2021,1), 2), ##  for phi.ad and phi.juv
+    seq(2004,2021,1)   ## for ann.fec
+    #rep(NA,4),         ## for mean p
+    #seq(1979,2021,1) ##  for p.ad
+  )) %>%     ## for deviance and agebeta
+  mutate(demographic=parameter) %>%
+  mutate(demographic=ifelse(grepl("fec",parameter,perl=T,ignore.case = T)==T,"fecundity",demographic))%>%
+  mutate(demographic=ifelse(grepl("phi",parameter,perl=T,ignore.case = T)==T,"survival",demographic))%>%
+  mutate(demographic=ifelse(grepl("Ntot",parameter,perl=T,ignore.case = T)==T,"pop.size",demographic)) %>%
+  mutate(demographic=ifelse(grepl("growth",parameter,perl=T,ignore.case = T)==T,"growth.rate",demographic)) %>%
+  mutate(demographic=ifelse(grepl("agebeta",parameter,perl=T,ignore.case = T)==T,"agebeta",demographic)) %>%
+  rename(Rhat=psrf) %>%
+  arrange(demographic,Year)
+tail(export)
 
-### need the following parameters from model
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,1]") # IM: 2210-3829
-which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[1,1,1]") 
-IM <- as.matrix(TRALipm$mcmc[[1]][,c(320:859)])    #### modify sequence of dimnames to only include ,,1] 
+## assess convergence and sample size
+summary(export$Rhat)
+summary(export$SSeff)
 
-### cannot include all chains as memory allocation error
-for(ch in 2:nc){
-   IM<-rbind(IM,as.matrix(TRALipm$mcmc[[ch]][,c(320:859)]))  ## only for the years coinciding with the fecundity and pop size
- }
+write.table(export,"TRAL_Gough_IPM_estimates_2022.csv", sep=",", row.names=F)
+save.image("TRAL_IPM_output_REV2022_FINAL.RData")
 
-IMpredictions<-as_tibble(IM) %>% gather(key="parameter", value="value") %>%
-	group_by(parameter) %>%
-	summarise(mean=mean(value), median=median(value), lcl=quantile(value,0.025), ucl=quantile(value,0.975))
+
+
+
+
+# #########################################################################
+# # SAVE OUTPUT - RESULT PROCESSING in TRAL_IPM_result_summaries.r
+# #########################################################################
+# ### DO NOT UPLOAD THIS TO GITHUB - IT WILL CORRUPT THE REPOSITORY
+# ### monitoring IM and JUV makes this workspace way too large to save
+# ### writing output files one by one
+# 
+# ## updated script for 'runjags' output
+# 
+# for(p in parameters){
+# summary_tralipm <- summary(TRALipm, vars=p)   ### ("mean.phi.ad","mean.phi.juv","mean.fec","mean.propensity", "mean.recruit",)does not run for all variables if IM is included
+# predictions <- data.frame(summary_tralipm,
+#                           parameter = row.names(summary_tralipm))
+# #summary_tralipm_df <- as.data.frame(summary_tralipm)
+# fwrite(predictions, sprintf("IPM_output_%s.csv",p))
+# }
+# 
+# 
+# 
+# #### FOR IM the above does not work
+# 
+# ### need the following parameters from model
+# which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[18,30,1]") # IM: 2210-3829
+# which(dimnames(TRALipm$mcmc[[1]])[[2]]=="IM[1,1,1]") 
+# IM <- as.matrix(TRALipm$mcmc[[1]][,c(320:859)])    #### modify sequence of dimnames to only include ,,1] 
+# 
+# ### cannot include all chains as memory allocation error
+# for(ch in 2:nc){
+#    IM<-rbind(IM,as.matrix(TRALipm$mcmc[[ch]][,c(320:859)]))  ## only for the years coinciding with the fecundity and pop size
+#  }
+# 
+# IMpredictions<-as_tibble(IM) %>% gather(key="parameter", value="value") %>%
+# 	group_by(parameter) %>%
+# 	summarise(mean=mean(value), median=median(value), lcl=quantile(value,0.025), ucl=quantile(value,0.975))
 fwrite(IMpredictions, sprintf("IPM_output_%s.csv",p))
 
 
